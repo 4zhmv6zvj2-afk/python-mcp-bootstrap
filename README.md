@@ -69,6 +69,11 @@ Install from PyPI:
 python -m pip install python-mcp-bootstrap
 ```
 
+PyPI installs require Python 3.14+. On Python 3.12 or 3.13 the package cannot be
+pip-installed; vendoring `core.py` is the supported path there (see
+[Vendoring](#vendoring)) — `core.py` is deliberately kept to 3.12 syntax and
+stdlib only for exactly that case.
+
 Releases from `v0.1.1` onward attach the wheel, the sdist, `SHA256SUMS`,
 Sigstore signature bundles (`.sigstore.json`), and a signed build-provenance
 attestation to the
