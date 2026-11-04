@@ -76,8 +76,15 @@ target-version = "py312"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
-ignore = ["E501"]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "S"]
+# S603/S606/S607: every subprocess call passes a fixed argv list with shell=False.
+ignore = ["E501", "S603", "S606", "S607"]
+
+[tool.ruff.lint.per-file-ignores]
+# pytest asserts are the test mechanism; fixed temp paths are test fixtures.
+"tests/**" = ["S101", "S108"]
+# "token" literals here are redaction keys, not credentials.
+"src/python_mcp_bootstrap/core.py" = ["S105"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["python_mcp_bootstrap"]

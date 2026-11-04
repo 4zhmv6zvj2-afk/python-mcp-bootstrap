@@ -1,6 +1,7 @@
 # python-mcp-bootstrap
 
 [![ci](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/actions/workflows/ci.yml/badge.svg)](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/actions/workflows/ci.yml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/badge)](https://securityscorecards.dev/viewer/?uri=github.com/4zhmv6zvj2-afk/python-mcp-bootstrap)
 
 A small setup helper for Python apps that use MCP.
 
