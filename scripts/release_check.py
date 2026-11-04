@@ -24,9 +24,48 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-PIN = "3.15.2"
-REQUIRED = ">=3.14"
 LOCAL_PATTERNS = ("/Volumes/", "ssd storage", "gho_", "github_pat_")
+
+
+def _core_constants(
+    core_path: Path,
+) -> tuple[str, tuple[int, int, int]] | None:
+    """Read ``PIN`` and ``REQUIRED`` from a core.py without importing it."""
+
+    try:
+        tree = ast.parse(core_path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return None
+    pin: str | None = None
+    required_parts: list[int] | None = None
+    for node in tree.body:
+        if (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == "PIN"
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+        ):
+            pin = node.value.value
+        if (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "REQUIRED"
+            and isinstance(node.value, ast.Tuple)
+            and len(node.value.elts) == 3
+        ):
+            parts: list[int] = []
+            for element in node.value.elts:
+                if not isinstance(element, ast.Constant) or not isinstance(element.value, int):
+                    parts = []
+                    break
+                parts.append(element.value)
+            if len(parts) == 3:
+                required_parts = parts
+    if pin is None or required_parts is None:
+        return None
+    return pin, (required_parts[0], required_parts[1], required_parts[2])
 
 
 def package_version(root: Path = ROOT) -> str:
@@ -328,8 +367,21 @@ def check(root: Path = ROOT, *, allow_dirty: bool = False, tag: str | None = Non
         version = ""
     require(project.get("name") == "python-mcp-bootstrap", "unexpected project name")
     failures.extend(_version_config_errors(project, tool_config))
-    require(project.get("requires-python") == REQUIRED, "requires-python is not >=3.14")
     require(project.get("license") == "MIT", "project license is not MIT")
+
+    core_path = root / "src" / "python_mcp_bootstrap" / "core.py"
+    core_constants: tuple[str, tuple[int, int, int]] | None = None
+    if core_path.is_file():
+        core_constants = _core_constants(core_path)
+    if core_constants is None:
+        failures.append("cannot read PIN and REQUIRED from core.py")
+    else:
+        pin, required = core_constants
+        floor_text = f">={required[0]}.{required[1]}"
+        require(
+            project.get("requires-python") == floor_text,
+            f"requires-python is not {floor_text}",
+        )
     if tag is not None:
         require(tag == f"v{version}", f"tag {tag!r} does not match version {version!r}")
         if tag == f"v{version}":
@@ -340,8 +392,12 @@ def check(root: Path = ROOT, *, allow_dirty: bool = False, tag: str | None = Non
 
     pin_path = root / ".python-version"
     require(pin_path.is_file(), "missing .python-version")
-    if pin_path.is_file():
-        require(pin_path.read_text(encoding="utf-8").strip() == PIN, "python pin is not 3.15.2")
+    if pin_path.is_file() and core_constants is not None:
+        pin, _required = core_constants
+        require(
+            pin_path.read_text(encoding="utf-8").strip() == pin,
+            f"python pin is not {pin}",
+        )
 
     license_path = root / "LICENSE"
     require(license_path.is_file(), "missing LICENSE")

@@ -435,6 +435,10 @@ pytest-cov==7.1.0 \
     --hash=sha256:30674f2b5f6351aa09702a9c8c364f6a01c27aae0c1366ae8016160d1efc56b2 \
     --hash=sha256:a0461110b7865f9a271aa1b51e516c9a95de9d696734a2f71e3e78f46e1d4678
     # via python-mcp-bootstrap (pyproject.toml)
+ruamel-yaml==0.19.1 \
+    --hash=sha256:27592957fedf6e0b62f281e96effd28043345e0e66001f97683aa9a40c667c93 \
+    --hash=sha256:53eb66cd27849eff968ebf8f0bf61f46cdac2da1d1f3576dd4ccee9b25c31993
+    # via python-mcp-bootstrap (pyproject.toml)
 ruff==0.17.3 \
     --hash=sha256:029c37cbd3de48ca37aa12117bead2d065f15da17d66bf84e0d4274013705db2 \
     --hash=sha256:27bb571ac78fef178fe5118d2827df95c2aae74a48fff2b15f6acd03af5ff5bb \
