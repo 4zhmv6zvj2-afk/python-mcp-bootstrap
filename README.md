@@ -17,7 +17,20 @@ no runtime dependency on the MCP SDK and never imports one.
 
 **Most people do not need to run this directly.** The app's setup script uses
 it. If you are a developer adding it to an app, jump to
-[For developers](#for-developers).
+[For developers](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/blob/main/README.md#for-developers).
+
+## Why this is public
+
+This helper runs before an app's dependencies exist, which means it executes
+during someone else's setup. A tool in that position should be inspectable
+rather than trusted on faith: the source is MIT-licensed, the PyPI wheel and
+sdist are the same code published from this repository, and releases from
+`v0.1.2` onward are checksummed, signed and attested (see
+[release verification](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/blob/main/README.md#verifying-releases)).
+It makes no network calls of its own, has no telemetry, and has no runtime
+dependency on the MCP SDK. After you pass `--install-python`, provisioning runs
+`uv` to download the pinned interpreter and install the app's dependencies from
+the package index you configured.
 
 ## Do I need this?
 
@@ -71,17 +84,26 @@ python -m pip install python-mcp-bootstrap
 
 PyPI installs require Python 3.14+. On Python 3.12 or 3.13 the package cannot be
 pip-installed; vendoring `core.py` is the supported path there (see
-[Vendoring](#vendoring)) — `core.py` is deliberately kept to 3.12 syntax and
+[Vendoring](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/blob/main/README.md#vendoring)) — `core.py` is deliberately kept to 3.12 syntax and
 stdlib only for exactly that case.
 
-Releases from `v0.1.2` onward attach the wheel, the sdist, `SHA256SUMS`,
-Sigstore signature bundles (`.sigstore.json`), and a signed build-provenance
-attestation to the
-[releases page](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/releases).
-All are built from the same tagged tree, so their digests match. `v0.1.0`
-predates the attestation step: it has `SHA256SUMS` and the `.sigstore.json`
-signatures, but no `provenance.intoto.jsonl`. `v0.1.1` was tagged but never
-published; it is history only.
+GitHub releases from `v0.1.2` onward attach the wheel, the sdist,
+`SHA256SUMS`, Sigstore signature bundles (`.sigstore.json`), and a signed
+build-provenance attestation to the
+[releases page](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/releases). All are built from the same tagged tree, so
+their digests match. `v0.1.0` predates the attestation step: it has
+`SHA256SUMS` and the `.sigstore.json` signatures, but no
+`provenance.intoto.jsonl`.
+
+Version history as users see it on PyPI:
+`v0.1.1` was tagged but never published. `v0.1.3` exists on GitHub only: PyPI
+permanently reserves the filenames of a deleted release, and an earlier
+iteration of this repository had published and removed that version. `v0.1.4`
+was skipped for the same filename reason. `0.1.5` is the first installable
+release after `0.1.2`, and `pip install python-mcp-bootstrap` resolves to the
+newest release.
+
+### Verifying releases
 
 To verify a download:
 
@@ -171,11 +193,11 @@ The vendoring tool (`scripts/vendor.py`) ships in the source tree, not in the
 wheel: vendoring requires a source checkout. A PyPI install provides the
 contract and the diagnostic CLI, not the vendor command.
 
-- Contract: [docs/contract.md](docs/contract.md)
-- Integration details: [docs/integration.md](docs/integration.md)
-- Example first run: [examples/first_run.py](examples/first_run.py)
-- Changelog: [CHANGELOG.md](CHANGELOG.md)
-- Contributing and release checks: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Contract: [docs/contract.md](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/blob/main/docs/contract.md)
+- Integration details: [docs/integration.md](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/blob/main/docs/integration.md)
+- Example first run: [examples/first_run.py](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/blob/main/examples/first_run.py)
+- Changelog: [CHANGELOG.md](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/blob/main/CHANGELOG.md)
+- Contributing and release checks: [CONTRIBUTING.md](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/blob/main/CONTRIBUTING.md)
 
 ## Development
 
@@ -202,4 +224,4 @@ pool is capacity-constrained and must not gate merges.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/blob/main/LICENSE).
