@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
-from scripts.vendor import MANIFEST_NAME, main, package_version, sha256, vendor
+from scripts.vendor import MANIFEST_NAME, git_commit, main, package_version, sha256, vendor
 
 from python_mcp_bootstrap import __version__
 
@@ -30,13 +30,9 @@ def test_vendor_writes_core_and_manifest(tmp_path: Path) -> None:
     assert manifest["sha256"] == sha256(dest)
     assert manifest["tag"] == f"v{__version__}"
     assert manifest["source"].startswith("https://github.com/")
-    commit = manifest["commit"]
-    if (Path(__file__).resolve().parents[1] / ".git").exists():
-        assert len(commit) == 40
-        assert all(character in "0123456789abcdef" for character in commit)
-    else:
-        # An unpacked source archive has no git metadata to record.
-        assert commit == "unknown"
+    # git_commit() is the same oracle vendor() uses: the real commit in a
+    # checkout, "unknown" in an unpacked source archive.
+    assert manifest["commit"] == git_commit()
 
 
 def test_vendor_check_passes_then_detects_an_edit(tmp_path: Path) -> None:
