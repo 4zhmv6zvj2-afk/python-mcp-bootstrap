@@ -17,15 +17,16 @@ arguments plus a `BootstrapSpec`:
 | `required` | Minimum final interpreter version | `(3, 14, 0)` |
 | `pin` | Plain final interpreter version (`X[.Y[.Z]]`) installed after consent; must be at or above `required` | `3.15.2` |
 | `install_args` | Arguments to `uv pip install`; path-like entries must not be absolute, Windows-rooted, or contain `..`, including attached short values (`-t/tmp/x`); `--target`, `--prefix`, `--root`, and `--python` (and short forms) are reserved | `("-e", ".")` |
-| `verify_import` | Module imported, in isolated mode, to verify the install | `None` |
-| `card` | Consent text returned when a download would be needed; the default names `spec.pin` | built-in card |
+| `verify_import` | Module imported, in isolated mode, to verify the install; must be dotted identifiers and must not contain Python keywords | `None` |
+| `card` | Consent text returned when a download would be needed; must be non-empty, and the default names `spec.pin` | built-in card |
 | `repair_card` | Consent text returned when an existing venv needs the app/MCP reinstalled | built-in repair card |
 
 Bootstrap flags are reserved and removed before the application sees its
 arguments:
 
 - `--python PATH` — use and check a named interpreter. `--python=PATH` is also
-  accepted; an empty value or a following flag is a usage error.
+  accepted; an empty value, a value beginning with `-`, or a following flag is a
+  usage error (`python_flag_missing`, exit `2`).
 - `--install-python` — consent to provision the pinned interpreter.
 - `--` — stop bootstrap parsing; everything after it belongs to the app.
 

@@ -692,7 +692,10 @@ def test_double_dash_stops_bootstrap_flag_parsing(tmp_path: Path) -> None:
     assert seen == [["--install-python", "--python", "not-a-flag"]]
 
 
-@pytest.mark.parametrize("args", [["--python="], ["--python", "--install-python"]])
+@pytest.mark.parametrize(
+    "args",
+    [["--python="], ["--python", "--install-python"], ["--python", "-x"], ["--python=-x"]],
+)
 def test_incomplete_python_override_is_a_usage_error(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], args: list[str]
 ) -> None:

@@ -8,6 +8,7 @@ entry point that may execute before the application's dependencies exist.
 from __future__ import annotations
 
 import json
+import keyword
 import os
 import re
 import shutil
@@ -96,6 +97,8 @@ class BootstrapSpec:
         if self.verify_import is not None and not _valid_module(self.verify_import):
             raise ValueError(f"verify_import is not a module: {self.verify_import!r}")
         object.__setattr__(self, "install_args", _spec_install_args(self.install_args))
+        if not self.card.strip():
+            raise ValueError("card must not be empty")
         if not self.repair_card.strip():
             raise ValueError("repair_card must not be empty")
         if self.card == CARD and self.pin != PIN:
@@ -131,7 +134,9 @@ def _spec_install_args(values: object) -> tuple[str, ...]:
 
 def _valid_module(value: str) -> bool:
     parts = value.split(".")
-    return bool(parts) and all(part.isidentifier() for part in parts)
+    return bool(parts) and all(
+        part.isidentifier() and not keyword.iskeyword(part) for part in parts
+    )
 
 
 def _escapes_project(value: str) -> bool:
@@ -327,7 +332,7 @@ def find_uv() -> str | None:
     return None
 
 
-_CREDENTIAL_URL = re.compile(r"([A-Za-z][A-Za-z0-9+.-]*://)[^@\s]*@")
+_CREDENTIAL_URL = re.compile(r"([A-Za-z][A-Za-z0-9+.-]*://)\S*@")
 _SECRET_FIELD = re.compile(
     r"(?i)([\"']?\b(?:[A-Za-z0-9]+[_-])*"
     r"(?:token|api[_-]?key|password|passwd|secret|private[_-]?key|access[_-]?key)"
@@ -750,7 +755,7 @@ def bootstrap(
             cleaned.extend(args[index + 1 :])
             break
         if token == "--python":
-            if index + 1 >= len(args) or args[index + 1].startswith("--"):
+            if index + 1 >= len(args) or args[index + 1].startswith("-"):
                 return _report(
                     {
                         "ok": False,
@@ -765,7 +770,7 @@ def bootstrap(
             continue
         if token.startswith("--python="):
             value = token.split("=", 1)[1]
-            if not value:
+            if not value or value.startswith("-"):
                 return _report(
                     {
                         "ok": False,
