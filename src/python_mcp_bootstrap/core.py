@@ -26,6 +26,8 @@ Exec = Callable[[str, list[str], dict[str, str]], int | None]
 
 REQUIRED: Version = (3, 14, 0)
 PIN = "3.15.2"
+# uv releases before this cannot resolve the pinned managed-Python build.
+UV_MIN_FOR_PIN: Version = (0, 13, 0)
 VENV_DIR = ".venv"
 PYTHON_DIR = ".uv-python"
 PIN_FILE = ".python-version"
@@ -456,6 +458,21 @@ def _failed(reason: str, spec: BootstrapSpec, **extra: object) -> dict[str, Any]
     return payload
 
 
+def _uv_version(run: Runner, uv: str | None, root: Path, env: dict[str, str]) -> Version | None:
+    """Return the installed uv version, or None when it cannot be determined."""
+
+    if uv is None:
+        return None
+    result = run([uv, "--version"], root, env, 10)
+    match = re.search(
+        r"(\d+)\.(\d+)\.(\d+)",
+        str(result.get("stdout", "")) + str(result.get("stderr", "")),
+    )
+    if match is None:
+        return None
+    return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+
+
 def _verification_failure(
     python: Path, spec: BootstrapSpec, found: Version, *, override: bool
 ) -> dict[str, Any]:
@@ -830,5 +847,14 @@ def bootstrap(
         payload = dict(provisioned)
         payload["installed"] = False
         code = 4 if provisioned.get("reason") == "needs_uv" else 5
+        if provisioned.get("reason") == "provision_failed":
+            found_uv = uv or find_uv()
+            version = _uv_version(run, found_uv, root, dict(os.environ))
+            if version is not None and version < UV_MIN_FOR_PIN:
+                payload["tip"] = (
+                    f"installed uv reports {format_version(version)}, which may not resolve "
+                    "the pinned Python build. Run `uv self update`, or pass --python with an "
+                    "interpreter that is already installed."
+                )
         return _report(payload, code)
     return _exec(exec_fn, Path(str(provisioned["interpreter"])), root, spec, cleaned)
