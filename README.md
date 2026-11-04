@@ -69,9 +69,22 @@ Install from PyPI:
 python -m pip install python-mcp-bootstrap
 ```
 
-Each release also attaches the wheel, the sdist, and `SHA256SUMS` to the
-[releases page](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/releases).
-Both are built from the same tagged tree, so their digests match.
+Each release also attaches the wheel, the sdist, `SHA256SUMS`, Sigstore
+signature bundles (`.sigstore.json`), and a signed build-provenance attestation
+to the [releases page](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/releases).
+All are built from the same tagged tree, so their digests match.
+
+To verify a download:
+
+```bash
+sha256sum -c SHA256SUMS
+gh attestation verify python_mcp_bootstrap-<version>-py3-none-any.whl \
+  --repo 4zhmv6zvj2-afk/python-mcp-bootstrap
+```
+
+`gh attestation verify` checks the signed provenance record: which repository,
+commit, workflow and builder produced the file. The `.sigstore.json` bundles
+carry the matching keyless signatures.
 
 Use `BootstrapSpec` and `bootstrap()` from an app's first-run wrapper:
 
