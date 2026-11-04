@@ -335,6 +335,24 @@ def test_spec_rejects_a_bare_string_install_args() -> None:
         BootstrapSpec(app="example-mcp", install_args="-e .")  # type: ignore[arg-type]
 
 
+@pytest.mark.parametrize(
+    "bad_args",
+    [
+        ("--system",),
+        ("--break-system-packages",),
+        ("--find-links",),
+        ("--index-url",),
+        ("file:///tmp/wheels",),
+        ("--find-links=file:///tmp/wheels",),
+        ("C:tmp",),
+        ("--target=C:/tmp",),
+    ],
+)
+def test_spec_rejects_unsafe_install_args(bad_args: tuple[str, ...]) -> None:
+    with pytest.raises(ValueError, match="install_args"):
+        BootstrapSpec(app="example-mcp", install_args=bad_args)
+
+
 def test_spec_copies_install_args_and_required_to_tuples() -> None:
     """Callers may pass lists; the frozen spec must not retain them."""
 

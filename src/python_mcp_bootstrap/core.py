@@ -145,6 +145,7 @@ def _escapes_project(value: str) -> bool:
     return (
         posix.is_absolute()
         or windows.is_absolute()
+        or bool(windows.drive)
         or bool(windows.root)
         or ".." in posix.parts
         or ".." in windows.parts
@@ -156,7 +157,30 @@ def _require_project_path(field: str, value: str) -> None:
         raise ValueError(f"{field} must stay inside the project: {value!r}")
 
 
-_RESERVED_LONG_FLAGS = frozenset({"--target", "--prefix", "--root", "--python"})
+_RESERVED_LONG_FLAGS = frozenset(
+    {
+        "--target",
+        "--prefix",
+        "--root",
+        "--python",
+        "--system",
+        "--break-system-packages",
+    }
+)
+_VALUE_LONG_FLAGS = frozenset(
+    {
+        "--find-links",
+        "--index-url",
+        "--extra-index-url",
+        "--requirement",
+        "--constraint",
+        "--config-settings",
+        "--only-binary",
+        "--no-binary",
+        "--upgrade-strategy",
+    }
+)
+_FILE_URL = re.compile(r"(?i)^file(?:\+[a-z0-9.]+)?:")
 _RESERVED_SHORT_FLAGS = frozenset({"t", "p"})
 _VALUE_SHORT_FLAGS = frozenset({"e", "r", "c", "f", "i", "C"})
 
@@ -196,11 +220,15 @@ def _require_project_install_args(values: object) -> None:
     for value in values:
         if not isinstance(value, str):
             raise ValueError(f"install_args must be strings: {value!r}")
+        if _FILE_URL.match(value):
+            raise ValueError(f"install_args must not use a local file: URL: {value!r}")
         if value.startswith("-"):
             if value.startswith("--"):
                 name = value.split("=", 1)[0]
                 if name in _RESERVED_LONG_FLAGS:
                     raise ValueError(f"install_args must not redirect the install: {value!r}")
+                if name in _VALUE_LONG_FLAGS and "=" not in value:
+                    raise ValueError(f"install_args must pass {name} as {name}=VALUE: {value!r}")
                 embedded = value.split("=")[1:]
             else:
                 if _short_flag_problem(value):
@@ -208,7 +236,7 @@ def _require_project_install_args(values: object) -> None:
                         f"install_args must not redirect or escape the project: {value!r}"
                     )
                 embedded = []
-            if any(_escapes_project(part) for part in embedded):
+            if any(_FILE_URL.match(part) or _escapes_project(part) for part in embedded):
                 raise ValueError(f"install_args must stay inside the project: {value!r}")
             continue
         if _escapes_project(value):
