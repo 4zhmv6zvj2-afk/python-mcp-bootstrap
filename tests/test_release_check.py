@@ -361,3 +361,115 @@ def test_checksum_errors_detect_mismatch_and_missing(tmp_path: Path) -> None:
 def test_check_requires_a_notes_file(tmp_path: Path) -> None:
     failures = check(tmp_path, allow_dirty=True)
     assert any("pyproject.toml" in failure for failure in failures)
+
+
+def test_package_version_requires_a_version_literal(tmp_path: Path) -> None:
+    init = tmp_path / "src" / "python_mcp_bootstrap" / "__init__.py"
+    init.parent.mkdir(parents=True)
+    init.write_text("", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="no __version__"):
+        package_version(tmp_path)
+
+
+def test_tracked_text_skips_unreadable_files(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        release_check,
+        "_git",
+        lambda *_args: SimpleNamespace(returncode=0, stdout="missing.txt\n", stderr=""),
+    )
+    assert release_check._tracked_text(ROOT) == {}
+
+
+def test_repo_slug_returns_none_without_a_remote(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("GITHUB_REPOSITORY", raising=False)
+    monkeypatch.setattr(
+        release_check,
+        "_git",
+        lambda *_args: SimpleNamespace(returncode=1, stdout="", stderr=""),
+    )
+    assert release_check._repo_slug(ROOT) is None
+
+
+@pytest.mark.parametrize(
+    "raw",
+    ["", "  \n\t ", '{"not": "a list"}', '[{"tag_name": "v1"}]'],
+)
+def test_parse_release_pages_ignores_non_list_pages(raw: str) -> None:
+    pages = release_check._parse_release_pages(raw)
+    assert all(isinstance(page, dict) for page in pages)
+
+
+def test_release_assets_handles_a_missing_assets_list(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _install_fake_gh(
+        monkeypatch,
+        tmp_path,
+        releases=[{"tag_name": "v0.1.0"}],
+        contents={},
+    )
+    g = release_check.shutil.which("gh")
+    assert g is not None
+    assert release_check._release_assets(ROOT, g, "v0.1.0", "owner/repo") == {}
+
+
+def test_release_asset_check_skips_without_a_repo_slug(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(release_check.shutil, "which", lambda _name: "/fake/gh")
+    monkeypatch.setattr(release_check, "_repo_slug", lambda _root: None)
+    assert _release_asset_errors(ROOT, "v0.1.0", "0.1.0") == []
+    assert "cannot determine the repository" in capsys.readouterr().err
+
+
+def test_checksum_errors_report_malformed_and_missing_entries(tmp_path: Path) -> None:
+    wheel = tmp_path / "python_mcp_bootstrap-0.1.0-py3-none-any.whl"
+    wheel.write_bytes(b"wheel")
+    (tmp_path / "SHA256SUMS").write_text(
+        "not-a-valid-line\n" + f"{'0' * 64}  absent.bin\n" + f"{'1' * 64}  {wheel.name}\n",
+        encoding="utf-8",
+    )
+    errors = _checksum_errors(tmp_path, "0.1.0")
+    assert any("malformed SHA256SUMS" in error for error in errors)
+    assert any("missing asset absent.bin" in error for error in errors)
+    assert any("does not list" in error and "tar.gz" in error for error in errors)
+
+
+def test_check_reports_unreadable_pyproject(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text("not = [toml", encoding="utf-8")
+    failures = check(tmp_path, allow_dirty=True)
+    assert any("unreadable pyproject.toml" in failure for failure in failures)
+
+
+def test_check_reports_a_non_git_tree(tmp_path: Path) -> None:
+    failures = check(tmp_path, allow_dirty=False)
+    assert any("not a Git checkout" in failure for failure in failures)
+
+
+def test_check_reports_machine_specific_tracked_text(tmp_path: Path) -> None:
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    pattern = "/Vol" + "umes/" + "SSD " + "storage/project"
+    (tmp_path / "notes.txt").write_text(f"built in {pattern}\n", encoding="utf-8")
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    (scripts / "release_check.py").write_text("/Vol" + "umes/ignored-here\n", encoding="utf-8")
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "add", "notes.txt", "scripts/release_check.py"],
+        check=True,
+    )
+    failures = check(tmp_path, allow_dirty=True)
+    flagged = [failure for failure in failures if "machine-specific" in failure]
+    assert any("notes.txt" in failure for failure in flagged)
+    assert not any("scripts/release_check.py" in failure for failure in flagged)
+
+
+def test_main_reports_failures_and_success(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(release_check, "check", lambda **_kwargs: ["boom"])
+    assert release_check.main(["--allow-dirty"]) == 1
+    assert "release check failed: boom" in capsys.readouterr().err
+
+    monkeypatch.setattr(release_check, "check", lambda **_kwargs: [])
+    assert release_check.main(["--allow-dirty"]) == 0
+    assert "release check: ok" in capsys.readouterr().out

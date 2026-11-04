@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
-from scripts.vendor import MANIFEST_NAME, main, sha256, vendor
+from scripts.vendor import MANIFEST_NAME, main, package_version, sha256, vendor
 
 from python_mcp_bootstrap import __version__
 
@@ -86,3 +86,87 @@ def test_vendor_cli_reports_json(tmp_path: Path, capsys: pytest.CaptureFixture[s
     assert code == 0
     assert payload["ok"] is True
     assert payload["check"] is False
+
+
+def test_package_version_requires_a_version_literal(tmp_path: Path) -> None:
+    init = tmp_path / "src" / "python_mcp_bootstrap" / "__init__.py"
+    init.parent.mkdir(parents=True)
+    init.write_text("", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="no __version__"):
+        package_version(tmp_path)
+
+
+def test_check_detects_a_missing_vendored_file(tmp_path: Path) -> None:
+    vendor(tmp_path, _dest())
+    dest = tmp_path / _dest()
+    dest.unlink()
+
+    checked = vendor(tmp_path, _dest(), check=True)
+    assert checked["ok"] is False
+    assert any("missing vendored file" in error for error in checked["errors"])
+
+
+def test_check_detects_a_missing_manifest(tmp_path: Path) -> None:
+    vendor(tmp_path, _dest())
+    (tmp_path / _dest()).with_name(MANIFEST_NAME).unlink()
+
+    checked = vendor(tmp_path, _dest(), check=True)
+    assert checked["ok"] is False
+    assert any("missing manifest" in error for error in checked["errors"])
+
+
+def test_check_detects_an_unreadable_manifest(tmp_path: Path) -> None:
+    vendor(tmp_path, _dest())
+    manifest_path = (tmp_path / _dest()).with_name(MANIFEST_NAME)
+    manifest_path.write_text("not json", encoding="utf-8")
+
+    checked = vendor(tmp_path, _dest(), check=True)
+    assert checked["ok"] is False
+    assert any("unreadable manifest" in error for error in checked["errors"])
+
+
+def test_check_detects_a_non_object_manifest(tmp_path: Path) -> None:
+    vendor(tmp_path, _dest())
+    manifest_path = (tmp_path / _dest()).with_name(MANIFEST_NAME)
+    manifest_path.write_text("[]", encoding="utf-8")
+
+    checked = vendor(tmp_path, _dest(), check=True)
+    assert checked["ok"] is False
+    assert "manifest is not a JSON object" in checked["errors"]
+
+
+def test_vendor_rejects_an_absolute_dest(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="inside target"):
+        vendor(tmp_path, str(tmp_path / "x.py"))
+
+
+def test_vendor_rejects_the_manifest_as_dest(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="manifest"):
+        vendor(tmp_path, MANIFEST_NAME)
+
+
+def test_vendor_rejects_a_file_as_target(tmp_path: Path) -> None:
+    target = tmp_path / "file"
+    target.write_text("x", encoding="utf-8")
+    with pytest.raises(NotADirectoryError):
+        vendor(target, _dest())
+
+
+def test_cli_reports_errors_and_check_failures(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["--target", str(tmp_path), "--dest", "../outside.py"]) == 2
+    assert "vendor:" in capsys.readouterr().err
+
+    vendor(tmp_path, _dest())
+    target = tmp_path / _dest()
+    target.write_text(target.read_text(encoding="utf-8") + "\n# edit\n", encoding="utf-8")
+    assert main(["--target", str(tmp_path), "--dest", _dest(), "--check"]) == 1
+    assert "vendor:" in capsys.readouterr().err
+
+
+def test_cli_prints_success_text(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["--target", str(tmp_path), "--dest", _dest()]) == 0
+    assert "vendored:" in capsys.readouterr().out
+    assert main(["--target", str(tmp_path), "--dest", _dest(), "--check"]) == 0
+    assert "verified:" in capsys.readouterr().out

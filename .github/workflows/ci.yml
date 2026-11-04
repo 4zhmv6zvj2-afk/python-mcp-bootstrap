@@ -43,7 +43,7 @@ jobs:
       - name: Types
         run: python -m mypy
       - name: Tests
-        run: python -m pytest --cov=python_mcp_bootstrap --cov-report=term-missing --cov-fail-under=90
+        run: python -m pytest --cov --cov-report=term-missing --cov-fail-under=90
 
   py312-smoke:
     name: Python 3.12 import and exercise
@@ -129,7 +129,7 @@ jobs:
           tar -xzf dist/*.tar.gz -C /tmp/sdist
           cd /tmp/sdist/python_mcp_bootstrap-*
           python -m pip install --require-hashes -r requirements-ci.txt
-          python -m pytest -q --no-header --cov=python_mcp_bootstrap --cov-fail-under=90
+          python -m pytest -q --no-header --cov --cov-report=term-missing --cov-fail-under=90
 
   example:
     name: Vendored example first run (real uv)
