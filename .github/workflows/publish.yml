@@ -20,7 +20,8 @@ jobs:
     environment: pypi
     permissions:
       contents: write  # attach artifacts and signatures to the GitHub release
-      id-token: write
+      id-token: write  # PyPI trusted publishing and provenance signing
+      attestations: write  # GitHub build-provenance attestation store
     env:
       TAG: ${{ inputs.tag || github.event.release.tag_name }}
       GH_TOKEN: ${{ github.token }}
@@ -49,6 +50,12 @@ jobs:
 
       - name: Build wheel and sdist
         run: python -m build
+
+      - name: Attest build provenance
+        id: attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        with:
+          subject-path: "dist/*"
 
       - name: Publish with OIDC trusted publishing
         uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086  # release/v1
@@ -79,3 +86,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$TAG" dist/*.sigstore.json --clobber
+
+      - name: Attach build provenance
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp "${{ steps.attest.outputs.bundle-path }}" dist/provenance.intoto.jsonl
+          gh release upload "$TAG" dist/provenance.intoto.jsonl --clobber
