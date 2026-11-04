@@ -1,0 +1,9 @@
+# Local pre-commit hooks. CI runs the same ruff checks, so this only moves
+# failures earlier. Install once with: pre-commit install
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.3
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
