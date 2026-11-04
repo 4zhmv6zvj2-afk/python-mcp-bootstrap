@@ -134,6 +134,10 @@ def test_spec_rejects_empty_app_and_bad_pin() -> None:
         BootstrapSpec(app="example-mcp", pin="main")
     with pytest.raises(ValueError, match="verify_import"):
         BootstrapSpec(app="example-mcp", verify_import="not a module")
+    with pytest.raises(ValueError, match="verify_import"):
+        BootstrapSpec(app="example-mcp", verify_import="import")
+    with pytest.raises(ValueError, match="card"):
+        BootstrapSpec(app="example-mcp", card=" ")
     with pytest.raises(ValueError, match="repair_card"):
         BootstrapSpec(app="example-mcp", repair_card=" ")
 
@@ -396,12 +400,14 @@ def test_spec_rejects_a_bad_required(bad_required: object) -> None:
         "ssh://user:s3cret@example/repo",
         "git+ssh://user:s3cret@example/repo",
         "https://user:pa/ss@example/simple",
+        "https://user:p@ss@example/simple",
     ],
 )
 def test_redact_masks_url_userinfo(text: str) -> None:
     masked = core._redact(text)
     assert "s3cret" not in masked
     assert "pa/ss" not in masked
+    assert "p@ss" not in masked
     assert "***@" in masked
 
 
