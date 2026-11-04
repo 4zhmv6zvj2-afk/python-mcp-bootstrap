@@ -28,7 +28,13 @@ def test_vendor_writes_core_and_manifest(tmp_path: Path) -> None:
     assert manifest["sha256"] == sha256(dest)
     assert manifest["tag"] == "v0.1.0"
     assert manifest["source"].startswith("https://github.com/")
-    assert len(manifest["commit"]) == 40
+    commit = manifest["commit"]
+    if (Path(__file__).resolve().parents[1] / ".git").exists():
+        assert len(commit) == 40
+        assert all(character in "0123456789abcdef" for character in commit)
+    else:
+        # An unpacked source archive has no git metadata to record.
+        assert commit == "unknown"
 
 
 def test_vendor_check_passes_then_detects_an_edit(tmp_path: Path) -> None:

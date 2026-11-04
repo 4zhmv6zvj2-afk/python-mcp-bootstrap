@@ -55,6 +55,7 @@ include = [
   "/SECURITY.md",
   "/LICENSE",
   "/pyproject.toml",
+  "/.python-version",
 ]
 
 [tool.pytest.ini_options]

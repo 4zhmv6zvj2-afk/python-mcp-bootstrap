@@ -69,22 +69,25 @@ Install from PyPI:
 python -m pip install python-mcp-bootstrap
 ```
 
-Each release also attaches the wheel, the sdist, `SHA256SUMS`, Sigstore
-signature bundles (`.sigstore.json`), and a signed build-provenance attestation
-to the [releases page](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/releases).
-All are built from the same tagged tree, so their digests match.
+Releases from `v0.1.1` onward attach the wheel, the sdist, `SHA256SUMS`,
+Sigstore signature bundles (`.sigstore.json`), and a signed build-provenance
+attestation to the
+[releases page](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/releases).
+All are built from the same tagged tree, so their digests match. `v0.1.0`
+predates the attestation step: it has `SHA256SUMS` and the `.sigstore.json`
+signatures, but no `provenance.intoto.jsonl`.
 
 To verify a download:
 
 ```bash
 sha256sum -c SHA256SUMS
 gh attestation verify python_mcp_bootstrap-<version>-py3-none-any.whl \
-  --repo 4zhmv6zvj2-afk/python-mcp-bootstrap
+  --repo 4zhmv6zvj2-afk/python-mcp-bootstrap   # releases from v0.1.1 onward
 ```
 
 `gh attestation verify` checks the signed provenance record: which repository,
 commit, workflow and builder produced the file. The `.sigstore.json` bundles
-carry the matching keyless signatures.
+carry the matching keyless signatures for every release that has them.
 
 Use `BootstrapSpec` and `bootstrap()` from an app's first-run wrapper:
 
@@ -156,6 +159,10 @@ python scripts/vendor.py \
 Use `--check` to verify a pinned copy. The example app vendors `core.py` into
 `examples/_vendor/` and CI runs the same `vendor.py --check` sequence.
 
+The vendoring tool (`scripts/vendor.py`) ships in the source tree, not in the
+wheel: vendoring requires a source checkout. A PyPI install provides the
+contract and the diagnostic CLI, not the vendor command.
+
 - Contract: [docs/contract.md](docs/contract.md)
 - Integration details: [docs/integration.md](docs/integration.md)
 - Example first run: [examples/first_run.py](examples/first_run.py)
@@ -177,12 +184,13 @@ python -m mypy
 python -m build
 ```
 
-CI targets Python 3.14.10 and 3.15.2 on Ubuntu, macOS, and Windows, plus a 3.12
+CI targets Python 3.14.10 and 3.15.2 on Ubuntu and Windows, plus a 3.12
 compatibility job, a wheel/release gate, and the vendored example first run.
 `main` is protected: the release gate, the 3.12 job, and the vendored example
 run are required before a merge, and force-pushes and deletions are blocked.
-The OS matrix runs alongside them, so read the run rather than the badge — a
-queued cell is not green.
+The macOS 15 job (`.github/workflows/macos.yml`) runs the same suite on pushes
+to `main`, on tags, and weekly, but not on pull requests: GitHub's macOS arm64
+pool is capacity-constrained and must not gate merges.
 
 ## License
 

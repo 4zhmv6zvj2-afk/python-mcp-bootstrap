@@ -65,38 +65,46 @@ the build; a change that fixes a bug should include a regression test.
 
 ## Release
 
+The `publish` workflow builds, checksums, signs, attests and uploads the
+artifacts, then publishes to PyPI last — so a failure before the PyPI step
+leaves the version unconsumed and the workflow re-runnable.
+
 Before tagging, from the commit that will be tagged:
 
 ```bash
+python -m pip install --require-hashes -r requirements-build.txt
 python scripts/release_check.py
 python -m pytest --cov=python_mcp_bootstrap --cov-fail-under=90
-python -m build
+python -m build --no-isolation
 ```
 
-Rebuild `dist/` from that tip (`dist/` is gitignored), regenerate
-`dist/SHA256SUMS` for the wheel and sdist, and verify the wheel in a clean
-environment before attaching them:
-
-```bash
-python -m venv /tmp/wheel-check
-/tmp/wheel-check/bin/python -m pip install dist/*.whl
-/tmp/wheel-check/bin/python -m python_mcp_bootstrap --check
-```
-
-Tag with an annotated tag, push it, and attach the wheel and sdist to the
-GitHub release:
+Then create the annotated tag and the GitHub release:
 
 ```bash
 git tag -a v<version> -m "python-mcp-bootstrap v<version>"
 git push origin v<version>
-python scripts/release_check.py --tag v<version>
+gh release create v<version> --notes-file docs/releases/<version>.md
 ```
 
-Use annotated tags for releases. CI’s package job fails a tag/version mismatch
-and a lightweight tag when the tag is present; the `release-gate` workflow
-verifies the published release’s wheel, sdist, and `SHA256SUMS` assets. The
-release notes live in `docs/releases/`. Tags are unsigned for now; do not
-present a tag as a signature.
+Publishing the release triggers the workflow, which:
+
+1. rebuilds the wheel and sdist from the tagged tree with the pinned backend
+   (`python -m build --no-isolation`),
+2. writes `dist/SHA256SUMS`,
+3. uploads the wheel, sdist and `SHA256SUMS` to the release,
+4. attests build provenance and writes `dist/provenance.intoto.jsonl`,
+5. signs every artifact with Sigstore (`.sigstore.json`) and uploads the
+   bundles plus the provenance file,
+6. re-runs `python scripts/release_check.py --tag v<version>` as the final gate
+   (it downloads the assets and verifies the checksums, signatures and
+   provenance are present),
+7. publishes to PyPI with OIDC trusted publishing.
+
+Do not hand-attach assets and do not create a release before the checks above
+pass. If a step fails before PyPI publishing, fix and re-run the workflow
+(`gh workflow run publish.yml -f tag=v<version>`); the version is not consumed
+until PyPI accepts it. Tags stay deliberately unsigned: artifact signatures and
+provenance live in the release assets, and a tag is not a signature.
 
 ## Scope
 
