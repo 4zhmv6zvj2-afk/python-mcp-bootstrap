@@ -1,0 +1,50 @@
+name: macos
+
+# Runs the ci.yml test steps on GitHub's macOS arm64 pool, outside the PR path.
+#
+# Why separate: the macOS arm64 hosted pool is capacity-constrained and
+# intermittently queues jobs for 15+ minutes before cancelling them with zero
+# steps run ("The job was not acquired by Runner of type hosted"). Keeping it
+# off pull requests means a bad pool cannot mark a green PR unstable, and
+# pinning macos-15 avoids the busier macos-latest (macOS 26 arm64) pool.
+#
+# Keep the steps below in sync with the `test` job in ci.yml.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - name: Restore annotated release tag
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: |
+          git fetch origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}" --force
+          test "$(git cat-file -t "refs/tags/${GITHUB_REF_NAME}")" = "tag"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: "3.15.2"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+      - name: Format
+        run: python -m ruff format --check
+      - name: Lint
+        run: python -m ruff check
+      - name: Types
+        run: python -m mypy
+      - name: Tests
+        run: python -m pytest --cov=python_mcp_bootstrap --cov-report=term-missing --cov-fail-under=90
