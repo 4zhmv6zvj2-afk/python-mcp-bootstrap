@@ -40,15 +40,22 @@ strings are parser-only for probes and are rejected as pins.
 
 ## Selection order
 
-1. `--python PATH`, after probing it.
-2. The currently running interpreter, when it meets the floor.
+1. `--python PATH`, after probing it and, when `verify_import` is configured,
+   importing the module under it. An explicit interpreter is never silently
+   replaced: a failure is reported as `verify_import_failed` (exit `5`).
+2. The currently running interpreter, when it meets the floor and, when
+   `verify_import` is configured, can import the module. A good-enough
+   interpreter that cannot import the app is treated as unusable for this
+   application and selection continues.
 3. A project-local `.venv` that meets the floor and passes `verify_import`, when
    configured.
-4. The consent card, with no install and no write.
+4. The consent card (or the repair card), with no install and no write.
 
 The Python-download consent card is step 4. If a `.venv` meets the floor but
 the `verify_import` check fails, bootstrap returns `needs_install` and asks for
-`--install-python` before running the installer.
+`--install-python` before running the installer. The same `needs_install` report
+is returned when the running interpreter meets the floor but cannot import the
+app; with consent, provisioning continues into the project-local `.venv`.
 
 `verify_import` runs as `python -I -P -c "import ..."`. Only the target
 interpreter's own site-packages can satisfy it: the project cwd, the script
@@ -57,22 +64,36 @@ package at the project root therefore cannot hide a missing install.
 
 ## Provisioning sequence
 
-After explicit consent:
+After explicit consent, `provision()` runs in this order:
 
-1. `uv python install <pin>` with `UV_PYTHON_INSTALL_DIR` set to the
-   project-local `.uv-python` and `UV_PYTHON_PREFERENCE=only-managed`.
-2. Move an existing wrong-version `.venv` to `.venv.previous`.
-3. `uv venv .venv --python <pin> --seed`.
+1. Resolve `uv` (including the project-local search paths). If it is missing,
+   return `needs_uv` (exit `4`) with the official install tip; uv is never
+   downloaded or installed.
+2. If a `.venv` exists, probe it:
+   - meets the floor and passes `verify_import` (when configured) — reuse it:
+     no download, no new venv, and no pin write;
+   - interpreter too old, or the app/module is missing — move it aside to
+     `.venv.previous[-N]` (never deleted); a lock or OS error returns
+     `venv_locked` (exit `5`);
+   - a non-venv `.venv` directory is moved aside as well.
+3. When the venv must be (re)built, run `uv python install <pin>` and then
+   `uv venv .venv --python <pin> --seed`, with `UV_PYTHON_INSTALL_DIR` set to
+   the project-local `.uv-python`, `UV_PYTHON_PREFERENCE=only-managed`, and
+   `UV_PYTHON_DOWNLOADS=automatic`.
 4. `uv pip install <install_args> --python <venv python>`.
-5. Verify the interpreter version and, when configured, `verify_import`.
-6. Write `.python-version` to `spec.pin`, but only when step 1 ran in this
-   call (that is, when this run installed the pinned interpreter).
-7. Exec the entrypoint under the chosen interpreter.
+5. Verify with `verify_import` when configured, then probe the interpreter
+   version against the floor. Either failure returns `provision_failed`
+   (exit `5`).
+6. Write `.python-version` with `spec.pin`, but only when step 3 ran in this
+   call, that is, when this run installed the pinned interpreter.
+7. Return the chosen interpreter to the caller, which execs the entrypoint (or
+   continues in-process); an `OSError` during the handoff returns
+   `exec_failed` (exit `8`) as a JSON report.
 
 If a supported `.venv` already exists and only the app/MCP is missing, steps
-1–3 are skipped. The repair installs into that venv and does not download
-Python. Because this run did not install the pin, step 6 is skipped too: the
-existing pin file is left exactly as it was (including when it is absent).
+3–4 become a repair install into that venv: no Python download. Because this
+run did not install the pin, step 6 is skipped and the existing pin file is
+left exactly as it was (including when it is absent).
 
 ## Results and exit codes
 
