@@ -45,6 +45,12 @@ required check, so read the run rather than the badge: a queued macOS or
 Windows cell is not green. A green tag run is the strongest evidence for a
 release.
 
+## Tests for new functionality
+
+New functionality lands with tests. The suite runs in CI with a 90% line
+coverage floor (`--cov-fail-under=90`), so behaviour added without tests fails
+the build; a change that fixes a bug should include a regression test.
+
 ## Rules
 
 - `src/python_mcp_bootstrap/core.py` stays stdlib-only.

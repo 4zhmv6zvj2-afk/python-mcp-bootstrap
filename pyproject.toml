@@ -60,6 +60,8 @@ include = [
 [tool.pytest.ini_options]
 minversion = "8.0"
 addopts = "-ra --strict-markers"
+# Warnings are errors: the suite must stay warning-clean.
+filterwarnings = ["error"]
 testpaths = ["tests"]
 pythonpath = ["src", "."]
 
