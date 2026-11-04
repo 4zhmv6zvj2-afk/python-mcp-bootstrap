@@ -41,9 +41,42 @@ def _local_tag_is_annotated(tag: str) -> bool:
     return result.returncode == 0 and result.stdout.strip() == "tag"
 
 
-def test_package_version_matches_the_release() -> None:
-    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert package_version(ROOT) == project["project"]["version"]
+def test_version_is_dynamic_and_points_at_the_package_init() -> None:
+    data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    assert release_check._version_config_errors(data["project"], data["tool"]) == []
+    assert package_version(ROOT)  # still the source of truth for tags and notes
+
+
+def _version_config(project: dict[str, object], tool: dict[str, object]) -> list[str]:
+    return release_check._version_config_errors(project, tool)
+
+
+@pytest.mark.parametrize(
+    ("project", "tool", "message"),
+    [
+        (
+            {"dynamic": ["version"], "version": "0.1.5"},
+            {"hatch": {"version": {"path": "src/python_mcp_bootstrap/__init__.py"}}},
+            "static version",
+        ),
+        (
+            {},
+            {"hatch": {"version": {"path": "src/python_mcp_bootstrap/__init__.py"}}},
+            "must be dynamic",
+        ),
+        (
+            {"dynamic": ["version"]},
+            {"hatch": {"version": {"path": "src/other/__init__.py"}}},
+            "hatch version path",
+        ),
+        ({"dynamic": ["version"]}, {}, "hatch version path"),
+    ],
+)
+def test_version_configuration_errors(
+    project: dict[str, object], tool: dict[str, object], message: str
+) -> None:
+    errors = _version_config(project, tool)
+    assert any(message in error for error in errors)
 
 
 def test_current_tree_is_release_ready() -> None:

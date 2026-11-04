@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Check release invariants before tagging or publishing.
 
-The check is offline and read-only.  It verifies metadata, the changelog,
-release notes, Python compatibility, tag/version and annotated-tag agreement
-when ``--tag`` is given, GitHub release assets when ``gh`` is available, and
-tracked-file hygiene.
+The check is offline and read-only.  It verifies the dynamic version
+configuration, metadata, the changelog, release notes, Python compatibility,
+tag/version and annotated-tag agreement when ``--tag`` is given, GitHub release
+assets when ``gh`` is available, and tracked-file hygiene.
 """
 
 from __future__ import annotations
@@ -280,6 +280,28 @@ def _duplicate_heading_errors(text: str) -> list[str]:
     return [f"CHANGELOG has duplicate entries for {version}" for version in sorted(duplicates)]
 
 
+def _version_config_errors(project: object, tool: object) -> list[str]:
+    """Validate that the version is dynamic and sourced from the package init."""
+
+    errors: list[str] = []
+    project_map = project if isinstance(project, dict) else {}
+    dynamic = project_map.get("dynamic")
+    if not isinstance(dynamic, list) or "version" not in dynamic:
+        errors.append("pyproject version must be dynamic")
+    if "version" in project_map:
+        errors.append("pyproject must not have a static version")
+    tool_map = tool if isinstance(tool, dict) else {}
+    hatch = tool_map.get("hatch")
+    hatch_map = hatch if isinstance(hatch, dict) else {}
+    version_config = hatch_map.get("version")
+    config = version_config if isinstance(version_config, dict) else {}
+    path = config.get("path")
+    normalized = str(path).replace("\\", "/") if isinstance(path, str) else ""
+    if normalized != "src/python_mcp_bootstrap/__init__.py":
+        errors.append("hatch version path is not the package __init__")
+    return errors
+
+
 def check(root: Path = ROOT, *, allow_dirty: bool = False, tag: str | None = None) -> list[str]:
     failures: list[str] = []
 
@@ -290,10 +312,12 @@ def check(root: Path = ROOT, *, allow_dirty: bool = False, tag: str | None = Non
     pyproject_path = root / "pyproject.toml"
     require(pyproject_path.is_file(), "missing pyproject.toml")
     project: dict[str, object] = {}
+    tool_config: dict[str, object] = {}
     if pyproject_path.is_file():
         try:
             data = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
             project = data.get("project", {})
+            tool_config = data.get("tool", {})
         except (OSError, tomllib.TOMLDecodeError) as exc:
             failures.append(f"unreadable pyproject.toml: {exc}")
 
@@ -303,7 +327,7 @@ def check(root: Path = ROOT, *, allow_dirty: bool = False, tag: str | None = Non
         failures.append(f"unreadable package version: {exc}")
         version = ""
     require(project.get("name") == "python-mcp-bootstrap", "unexpected project name")
-    require(project.get("version") == version, "pyproject version does not match package")
+    failures.extend(_version_config_errors(project, tool_config))
     require(project.get("requires-python") == REQUIRED, "requires-python is not >=3.14")
     require(project.get("license") == "MIT", "project license is not MIT")
     if tag is not None:

@@ -103,6 +103,9 @@ jobs:
           python -m venv /tmp/wheel-check
           /tmp/wheel-check/bin/python -m pip install dist/*.whl
           /tmp/wheel-check/bin/python -m python_mcp_bootstrap --check
+      - name: Assert installed metadata version
+        run: |
+          /tmp/wheel-check/bin/python -c "import importlib.metadata as m, python_mcp_bootstrap as p; assert m.version('python-mcp-bootstrap') == p.__version__, m.version('python-mcp-bootstrap')"
       - name: Upload distributions
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
