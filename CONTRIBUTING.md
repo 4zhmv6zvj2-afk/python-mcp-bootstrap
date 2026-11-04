@@ -41,9 +41,9 @@ the vendored example run are required status checks before a pull request
 merges, and force-pushes and branch deletions are blocked.
 
 The 3.14/3.15 matrix runs alongside those required jobs, but it is not a
-required check, so read the run rather than the badge: a queued macOS or
-Windows cell is not green. A green tag run is the strongest evidence for a
-release.
+required check, so read the run rather than the badge: a queued Windows cell is
+not green. macOS runs on `main`, tags and a weekly schedule, not on pull
+requests. A green tag run is the strongest evidence for a release.
 
 ## Tests for new functionality
 

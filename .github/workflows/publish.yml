@@ -80,8 +80,10 @@ jobs:
       - name: Verify release assets, signatures and provenance
         run: python scripts/release_check.py --tag "$TAG"
 
-      - name: Verify build provenance attestation
-        run: gh attestation verify dist/*.whl --repo "$GITHUB_REPOSITORY"
+      - name: Verify build provenance attestations
+        run: |
+          gh attestation verify dist/*.whl --repo "$GITHUB_REPOSITORY"
+          gh attestation verify dist/*.tar.gz --repo "$GITHUB_REPOSITORY"
 
       - name: Stage PyPI distributions only
         run: |

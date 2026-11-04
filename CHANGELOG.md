@@ -42,8 +42,9 @@ under a fresh tag. The `v0.1.1` tag is kept as history only.
 - The release gate downloads and verifies published assets: `SHA256SUMS`
   against the bytes, plus signature bundles and provenance. `SHA256SUMS` uses
   plain filenames; both the checker and the workflow tolerate a leading `./`.
-- The extracted sdist contains `.python-version`; its suite passes outside a
-  git checkout.
+- The extracted sdist contains `.python-version`; CI now runs the extracted
+  sdist suite (repository-only workflow tests are skipped when `.github/` is
+  absent).
 
 ### Docs
 

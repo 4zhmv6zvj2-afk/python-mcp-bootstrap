@@ -59,6 +59,8 @@ include = [
   "/LICENSE",
   "/pyproject.toml",
   "/.python-version",
+  "/requirements-ci.txt",
+  "/requirements-build.txt",
 ]
 
 [tool.pytest.ini_options]

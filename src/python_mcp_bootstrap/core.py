@@ -577,9 +577,9 @@ def provision(
         uv,
         "pip",
         "install",
-        *spec.install_args,
         "--python",
         str(python),
+        *spec.install_args,
     ]
     result = run(install_command, root, env, 600)
     steps.append(_step(install_command, result))

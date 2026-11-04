@@ -74,25 +74,28 @@ pip-installed; vendoring `core.py` is the supported path there (see
 [Vendoring](#vendoring)) — `core.py` is deliberately kept to 3.12 syntax and
 stdlib only for exactly that case.
 
-Releases from `v0.1.1` onward attach the wheel, the sdist, `SHA256SUMS`,
+Releases from `v0.1.2` onward attach the wheel, the sdist, `SHA256SUMS`,
 Sigstore signature bundles (`.sigstore.json`), and a signed build-provenance
 attestation to the
 [releases page](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/releases).
 All are built from the same tagged tree, so their digests match. `v0.1.0`
 predates the attestation step: it has `SHA256SUMS` and the `.sigstore.json`
-signatures, but no `provenance.intoto.jsonl`.
+signatures, but no `provenance.intoto.jsonl`. `v0.1.1` was tagged but never
+published; it is history only.
 
 To verify a download:
 
 ```bash
 sha256sum -c SHA256SUMS
 gh attestation verify python_mcp_bootstrap-<version>-py3-none-any.whl \
-  --repo 4zhmv6zvj2-afk/python-mcp-bootstrap   # releases from v0.1.1 onward
+  --repo 4zhmv6zvj2-afk/python-mcp-bootstrap   # releases from v0.1.2 onward
 ```
 
 `gh attestation verify` checks the signed provenance record: which repository,
 commit, workflow and builder produced the file. The `.sigstore.json` bundles
-carry the matching keyless signatures for every release that has them.
+carry the matching keyless signatures for every release that has them; they can
+also be checked manually with `cosign verify-blob`, while `gh attestation verify`
+is the automated provenance path used by the release workflow.
 
 Use `BootstrapSpec` and `bootstrap()` from an app's first-run wrapper:
 
