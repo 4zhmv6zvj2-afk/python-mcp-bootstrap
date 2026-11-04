@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
+import sys
 import tomllib
 from pathlib import Path
 from types import SimpleNamespace
@@ -116,9 +118,18 @@ def _install_fake_gh(
     contents: dict[str, str],
     unreadable: bool = False,
 ) -> None:
-    script = tmp_path / "gh"
-    script.write_text(FAKE_GH, encoding="utf-8")
-    script.chmod(0o755)
+    if os.name == "nt":
+        implementation = tmp_path / "gh_impl.py"
+        implementation.write_text(FAKE_GH, encoding="utf-8")
+        script = tmp_path / "gh.cmd"
+        script.write_text(
+            f'@echo off\r\n"{sys.executable}" "{implementation}" %*\r\n',
+            encoding="utf-8",
+        )
+    else:
+        script = tmp_path / "gh"
+        script.write_text(FAKE_GH, encoding="utf-8")
+        script.chmod(0o755)
     state = tmp_path / "gh-state.json"
     state.write_text(
         json.dumps({"releases": releases, "contents": contents, "unreadable": unreadable}),
