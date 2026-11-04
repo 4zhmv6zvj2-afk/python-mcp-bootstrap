@@ -8,9 +8,14 @@
 
 ## Reporting
 
-Use GitHub's private vulnerability reporting: open the repository's
-**Security** tab and choose **Report a vulnerability**. That goes to the
-maintainer privately and keeps the report out of the public timeline.
+Report privately through GitHub's private vulnerability reporting:
+
+https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/security/advisories/new
+
+That reaches the maintainer privately and keeps the report out of the public
+timeline. We aim to acknowledge a report within 3 business days, agree a
+disclosure timeline with the reporter, and publish an advisory alongside the
+fix.
 
 If neither channel works for you, open a minimal public issue saying only that
 you have a security report and how to reach you. Do not put credentials,
