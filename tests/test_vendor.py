@@ -8,6 +8,8 @@ from pathlib import Path
 import pytest
 from scripts.vendor import MANIFEST_NAME, main, sha256, vendor
 
+from python_mcp_bootstrap import __version__
+
 
 def _dest() -> str:
     return "src/example/_vendor/python_mcp_bootstrap.py"
@@ -23,10 +25,10 @@ def test_vendor_writes_core_and_manifest(tmp_path: Path) -> None:
     assert manifest_path.is_file()
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["name"] == "python-mcp-bootstrap"
-    assert manifest["version"] == "0.1.0"
+    assert manifest["version"] == __version__
     assert manifest["file"] == dest.name
     assert manifest["sha256"] == sha256(dest)
-    assert manifest["tag"] == "v0.1.0"
+    assert manifest["tag"] == f"v{__version__}"
     assert manifest["source"].startswith("https://github.com/")
     commit = manifest["commit"]
     if (Path(__file__).resolve().parents[1] / ".git").exists():
