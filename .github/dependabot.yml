@@ -1,0 +1,22 @@
+version: 2
+
+updates:
+  # Keep the pinned Actions (checkout, setup-python, upload-artifact, pypi-publish)
+  # on supported releases.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Lift the dev-only floors in pyproject.toml (pytest, ruff, mypy, build, hatchling).
+  # Grouped so one PR carries the bump instead of one PR per package.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      dev:
+        patterns: ["*"]
