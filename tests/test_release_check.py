@@ -151,7 +151,7 @@ def test_checksum_errors_accept_matching_files(tmp_path: Path) -> None:
     lines = []
     for artifact in (wheel, sdist):
         digest = release_check._sha256(artifact)
-        lines.append(f"{digest}  {artifact.name}")
+        lines.append(f"{digest}  ./{artifact.name}")
     (tmp_path / "SHA256SUMS").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     assert _checksum_errors(tmp_path, "0.1.0") == []

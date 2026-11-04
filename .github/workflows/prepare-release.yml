@@ -60,7 +60,7 @@ jobs:
       - name: Write SHA256SUMS
         working-directory: dist
         run: |
-          sha256sum ./*.whl ./*.tar.gz > SHA256SUMS
+          sha256sum *.whl *.tar.gz > SHA256SUMS
           cat SHA256SUMS
 
       - name: Create or reuse a draft release

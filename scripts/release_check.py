@@ -148,6 +148,7 @@ def _checksum_errors(dest: Path, version: str) -> list[str]:
             errors.append(f"release asset check: malformed SHA256SUMS line {line!r}")
             continue
         digest, name = parts
+        name = name.removeprefix("./")
         listed.add(name)
         artifact = dest / name
         if not artifact.is_file():
