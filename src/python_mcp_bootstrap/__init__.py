@@ -28,7 +28,7 @@ from .core import (
     version_tuple,
 )
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 __all__ = [
     "CARD",

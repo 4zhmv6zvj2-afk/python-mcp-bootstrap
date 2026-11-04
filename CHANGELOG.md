@@ -1,5 +1,63 @@
 # Changelog
 
+## 0.1.2 — 2026-11-05
+
+First published release of the hardened 0.1.x line. `v0.1.1` was tagged but
+never published: after its initial immutable release was deleted, GitHub
+refused to bind a new release to that tag name, so the same content ships here
+under a fresh tag. The `v0.1.1` tag is kept as history only.
+
+### Added
+
+- Draft-first release pipeline: `prepare-release.yml` builds with the pinned
+  backend, writes `SHA256SUMS`, creates a draft release, uploads the wheel,
+  sdist, checksums, Sigstore signature bundles and a signed build-provenance
+  attestation, and verifies the draft. Publishing the draft fires
+  `publish.yml`, which re-verifies the published assets (checksums, signatures,
+  provenance) and publishes to PyPI last. The publishing workflow has no
+  permission to modify release assets.
+- Failure result `exec_failed` (exit `8`) when the chosen interpreter cannot be
+  started; JSON report with a redacted `detail`, never a traceback.
+- A `provision_failed` report carries a `tip` when the installed uv is older
+  than 0.13 and may not resolve the pinned interpreter.
+- Hash-pinned build, test, and uv requirements files, plus a
+  `.pre-commit-config.yaml` running the same ruff checks as CI.
+
+### Changed
+
+- `BootstrapSpec` is genuinely frozen: `required` and `install_args` are copied
+  to tuples and validated at construction; `required` raises `ValueError` for
+  bad lengths, non-integers, booleans, or non-sequences.
+- Credential redaction covers URL userinfo on any scheme (including passwords
+  containing `/`), `Authorization`/`Proxy-Authorization` headers (Basic, Bearer,
+  Token, Digest), and prefixed/suffixed credential keys such as
+  `AWS_SECRET_ACCESS_KEY` and `MY_API_KEY`.
+- `verify_import` is checked on every interpreter branch, including an explicit
+  `--python`; an explicit interpreter that cannot import the app reports
+  `verify_import_failed` (exit `5`), and a running interpreter that cannot
+  import it returns `needs_install` instead of reporting success.
+- `install_args` reject `--system`/`--break-system-packages`, `file:` URLs
+  (including inside `--flag=...`), drive-relative Windows paths such as
+  `C:tmp`, and value-taking long flags passed without `=`.
+- The release gate downloads and verifies published assets: `SHA256SUMS`
+  against the bytes, plus signature bundles and provenance. `SHA256SUMS` uses
+  plain filenames; both the checker and the workflow tolerate a leading `./`.
+- The extracted sdist contains `.python-version`; its suite passes outside a
+  git checkout.
+
+### Docs
+
+- Python-floor split documented: PyPI installs require 3.14+; Python 3.12/3.13
+  consumers vendor `core.py`.
+- Package metadata adds authors, maintainers, and Issues/README project URLs.
+- Contract, integration, and CONTRIBUTING release docs match the implemented
+  selection/provisioning order, exit codes, `install_args` rules, and the
+  draft-first release flow.
+
+## 0.1.1 — 2026-11-05
+
+Tagged but never published (see 0.1.2). Kept in the changelog for the record.
+
 ## 0.1.1 — 2026-11-05
 
 Patch release: behavior fixes and a release pipeline that produces verified,
