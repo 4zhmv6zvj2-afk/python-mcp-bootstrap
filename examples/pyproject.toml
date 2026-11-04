@@ -1,0 +1,13 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "example-mcp"
+version = "0.0.0"
+description = "Example MCP app for the python-mcp-bootstrap first-run wrapper."
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.hatch.build.targets.wheel]
+packages = ["example_mcp"]
