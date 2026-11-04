@@ -82,9 +82,10 @@ existing pin file is left exactly as it was (including when it is absent).
 | `2` | `python_flag_missing` | `--python` had no value |
 | `3` | `python_too_old` | No usable interpreter and no consent |
 | `4` | `needs_uv` | Consent was given, but uv is not installed; `tip` carries the official install instructions |
-| `5` | `provision_failed`, `venv_locked`, `pin_write_failed` | Provisioning, verification, or pin write failed |
+| `5` | `provision_failed`, `venv_locked`, `pin_write_failed`, `verify_import_failed` | Provisioning, verification, or pin write failed; `verify_import_failed` is reported when an explicitly chosen interpreter cannot import `verify_import` |
 | `6` | `needs_install` | Existing venv is missing the app/MCP; consent is needed to repair it |
 | `7` | `missing_continuation` | Re-entry with no continuation: `env_var` already names a usable interpreter and no `package_main`/`main_fn` is configured. Nothing is exec'd or downloaded |
+| `8` | `exec_failed` | The chosen interpreter could not be started (for example it vanished between probe and exec). A JSON report with a redacted `detail` is written; no traceback escapes |
 
 JSON reports go to stdout. Subprocess output is captured, truncated, and
 redacted; the report's `steps` carry the redacted command, return code, and

@@ -15,6 +15,7 @@ import pytest
 from python_mcp_bootstrap import core
 from python_mcp_bootstrap.core import (
     CARD,
+    REPAIR_CARD,
     BootstrapSpec,
     bootstrap,
     interpreter_version,
@@ -81,6 +82,77 @@ def _fake_venv(root: Path, spec: BootstrapSpec) -> Path:
     python.parent.mkdir(parents=True)
     python.write_text("#!/bin/sh\n", encoding="utf-8")
     return python
+
+
+def test_python_override_that_cannot_import_the_app_fails_verification(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The --python branch must not hand off to an interpreter lacking the app."""
+
+    spec = _spec()
+    execs = ExecRecorder()
+
+    code = bootstrap(
+        ["--python", "/opt/other-python"],
+        tmp_path,
+        spec,
+        exec_fn=execs,
+        run=ScriptedRunner([1]),
+        current=(3, 14, 10),
+        probe=lambda _exe: (3, 15, 2),
+    )
+
+    report = json.loads(capsys.readouterr().out)
+    assert code == 5
+    assert report["reason"] == "verify_import_failed"
+    assert report["override"] is True
+    assert report["interpreter"] == "/opt/other-python"
+    assert execs.calls == []
+
+
+def test_running_interpreter_without_the_app_asks_to_repair(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A good-enough interpreter missing the app gets the repair card, not success."""
+
+    spec = _spec()
+    execs = ExecRecorder()
+
+    code = bootstrap(
+        [],
+        tmp_path,
+        spec,
+        exec_fn=execs,
+        run=ScriptedRunner([1]),
+        current=(3, 14, 10),
+    )
+
+    report = json.loads(capsys.readouterr().out)
+    assert code == 6
+    assert report["reason"] == "needs_install"
+    assert report["card"] == REPAIR_CARD
+    assert report["interpreter"] == sys.executable
+    assert execs.calls == []
+
+
+def test_exec_oserror_becomes_a_json_report(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A vanished interpreter must produce a report, never a traceback."""
+
+    spec = _spec(verify_import=None)
+
+    def raising_exec(_path: str, _argv: list[str], _env: dict[str, str]) -> None:
+        raise OSError("interpreter vanished")
+
+    code = bootstrap([], tmp_path, spec, exec_fn=raising_exec, current=(3, 14, 10))
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+    assert code == 8
+    assert report["reason"] == "exec_failed"
+    assert "interpreter vanished" in report["detail"]
+    assert "Traceback" not in captured.err
 
 
 def test_below_floor_without_consent_stops_before_any_subprocess(
@@ -212,6 +284,7 @@ def test_python_override_is_checked_before_use(
         tmp_path,
         spec,
         exec_fn=execs,
+        run=RunRecorder(),
         current=(3, 12, 13),
         probe=lambda _exe: (3, 9, 6),
     )
@@ -225,6 +298,7 @@ def test_python_override_is_checked_before_use(
         tmp_path,
         spec,
         exec_fn=execs,
+        run=RunRecorder(),
         current=(3, 12, 13),
         probe=lambda _exe: (3, 16, 0),
     )
@@ -250,7 +324,7 @@ def test_a_good_running_python_calls_the_continuation(tmp_path: Path) -> None:
         return 0
 
     spec = _spec(package_main=main)
-    code = bootstrap(["--verbose"], tmp_path, spec, current=(3, 14, 10))
+    code = bootstrap(["--verbose"], tmp_path, spec, run=RunRecorder(), current=(3, 14, 10))
     assert code == 0
     assert seen == [["--verbose"]]
 
@@ -267,7 +341,7 @@ def test_in_process_continuation_sets_the_env_var(
 
     spec = _spec(package_main=main)
     monkeypatch.setenv("EXAMPLE_MCP_INTERPRETER", "before")
-    code = bootstrap([], tmp_path, spec, current=(3, 14, 10))
+    code = bootstrap([], tmp_path, spec, run=RunRecorder(), current=(3, 14, 10))
     assert code == 0
     assert seen == [sys.executable]
 
@@ -555,6 +629,7 @@ def test_double_dash_stops_bootstrap_flag_parsing(tmp_path: Path) -> None:
         ["--", "--install-python", "--python", "not-a-flag"],
         tmp_path,
         spec,
+        run=RunRecorder(),
         current=(3, 14, 10),
     )
 
@@ -674,6 +749,7 @@ def test_good_running_python_without_continuation_hands_off_once(
         tmp_path,
         _spec(),
         exec_fn=execs,
+        run=RunRecorder(),
         current=(3, 14, 10),
     )
 
@@ -690,7 +766,7 @@ def test_handed_off_entrypoint_without_continuation_is_reported(
     monkeypatch.setenv("EXAMPLE_MCP_INTERPRETER", sys.executable)
     execs = ExecRecorder()
 
-    code = bootstrap([], tmp_path, _spec(), exec_fn=execs, current=(3, 15, 2))
+    code = bootstrap([], tmp_path, _spec(), exec_fn=execs, run=RunRecorder(), current=(3, 15, 2))
 
     report = json.loads(capsys.readouterr().out)
     assert code == 7
@@ -707,7 +783,7 @@ def test_a_stale_env_var_that_names_nothing_still_hands_off(
     monkeypatch.setenv("EXAMPLE_MCP_INTERPRETER", str(tmp_path / "gone" / "python"))
     execs = ExecRecorder()
 
-    code = bootstrap([], tmp_path, _spec(), exec_fn=execs, current=(3, 15, 2))
+    code = bootstrap([], tmp_path, _spec(), exec_fn=execs, run=RunRecorder(), current=(3, 15, 2))
 
     assert code == 0
     assert len(execs.calls) == 1
