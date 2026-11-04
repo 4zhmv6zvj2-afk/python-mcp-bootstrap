@@ -1,9 +1,9 @@
 name: sign-release
 
-# Signs the assets of an existing GitHub release with Sigstore (keyless, via the
-# workflow's OIDC identity) and uploads the resulting .sigstore.json bundles.
-# Used to retrofit signatures onto releases created before signing was
-# automated in publish.yml (OpenSSF Scorecard Signed-Releases).
+# Signs the assets of an existing MUTABLE or draft GitHub release with Sigstore
+# (keyless, via the workflow's OIDC identity) and uploads the resulting
+# .sigstore.json bundles. It cannot modify an immutable release: those assets
+# are signed before publication by prepare-release.yml.
 
 on:
   workflow_dispatch:
