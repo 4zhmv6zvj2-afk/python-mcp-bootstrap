@@ -377,12 +377,51 @@ def test_spec_rejects_a_bad_required(bad_required: object) -> None:
         "https://user:s3cret@example/simple",
         "ssh://user:s3cret@example/repo",
         "git+ssh://user:s3cret@example/repo",
+        "https://user:pa/ss@example/simple",
     ],
 )
 def test_redact_masks_url_userinfo(text: str) -> None:
     masked = core._redact(text)
     assert "s3cret" not in masked
-    assert "***:***@" in masked
+    assert "pa/ss" not in masked
+    assert "***@" in masked
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Authorization: Basic dXNlcjpwYXNzd29yZA==",
+        "Proxy-Authorization: Basic cHJveHk6cGFzcw==",
+        "Authorization: Bearer abcdefghijklmnop",
+        "Authorization: Token tok_1234567890",
+        'Authorization: Digest username="u"',
+    ],
+)
+def test_redact_masks_authorization_headers(text: str) -> None:
+    masked = core._redact(text)
+    assert "***" in masked
+    for secret in (
+        "dXNlcjpwYXNzd29yZA==",
+        "cHJveHk6cGFzcw==",
+        "abcdefghijklmnop",
+        "tok_1234567890",
+    ):
+        assert secret not in masked
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "AWS_SECRET_ACCESS_KEY=abc123secret",
+        "MY_API_KEY: abcdef123456",
+        "db_password='hunter2'",
+        "private_key=keymaterial",
+    ],
+)
+def test_redact_masks_credential_shaped_fields(text: str) -> None:
+    masked = core._redact(text)
+    for secret in ("abc123secret", "abcdef123456", "hunter2", "keymaterial"):
+        assert secret not in masked
 
 
 def test_core_never_uses_a_shell_or_the_curl_tip() -> None:
