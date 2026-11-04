@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.1.6 — 2026-11-05
+
+First release exercising the hardened release gates end to end.
+
+### Changed
+
+- `--python` values beginning with `-` are usage errors (`python_flag_missing`,
+  exit `2`), in both the `--python -x` and `--python=-x` forms.
+- `verify_import` rejects Python keywords such as `import` when the spec is
+  built.
+- `BootstrapSpec.card` must be non-empty.
+- URL redaction masks passwords containing `@` through the last `@`, so
+  `https://user:p@ss@example` becomes `https://***@example`.
+
+### Pipeline
+
+- `release_check --tag` is draft-aware: it resolves releases through the
+  releases-list endpoint and downloads assets by id, so the `prepare-release`
+  final gate verifies a draft's assets instead of skipping. The required-asset
+  set (wheel, sdist, `SHA256SUMS`, three Sigstore bundles and provenance) and
+  the checksum verification are unchanged.
+- The release gate rejects duplicate `## <version> — <date>` changelog headings.
+- `pypi-dist/` is ignored.
+
+### Tooling
+
+- Coverage includes `scripts/` (95.91% total at the time of the change; the
+  90% floor is unchanged).
+- mypy strict covers `scripts/`.
+- The version is single-sourced: `pyproject.toml` declares `dynamic = ["version"]`
+  and hatch reads `__version__` from
+  `src/python_mcp_bootstrap/__init__.py`; the wheel job asserts the installed
+  distribution metadata matches `__version__`.
+- Packaging tests cover distribution metadata, the console-script entry point,
+  `__all__`, and `python -m python_mcp_bootstrap --version`.
+- `.github/PULL_REQUEST_TEMPLATE.md` added with the release checklist.
+
+### Docs
+
+- README: "Why this is public", absolute links for the PyPI description, and
+  version history (0.1.1 never published; 0.1.3 GitHub-only; 0.1.4 skipped;
+  0.1.5 the first installable release after 0.1.2).
+- CONTRIBUTING: the version bump is `__init__.__version__` only;
+  `pyproject.toml` has no version.
+
 ## 0.1.5 — 2026-11-05
 
 First installable release after PyPI 0.1.2. The code is identical to 0.1.3;
