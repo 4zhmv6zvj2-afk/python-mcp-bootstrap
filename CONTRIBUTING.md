@@ -65,46 +65,69 @@ the build; a change that fixes a bug should include a regression test.
 
 ## Release
 
-The `publish` workflow builds, checksums, signs, attests and uploads the
-artifacts, then publishes to PyPI last — so a failure before the PyPI step
-leaves the version unconsumed and the workflow re-runnable.
+Releases are draft-first because GitHub release immutability is enabled: assets
+cannot be attached after a release is published. Build and attach them while
+the release is still a draft, verify, then publish the draft.
 
-Before tagging, from the commit that will be tagged:
+1. Merge the version bump (`pyproject.toml`, `__init__.py`, the changelog entry
+   and `docs/releases/<version>.md`) to `main` with all checks green.
+2. From a clean `main`, run the release check and create the annotated tag:
 
-```bash
-python -m pip install --require-hashes -r requirements-build.txt
-python scripts/release_check.py
-python -m pytest --cov=python_mcp_bootstrap --cov-fail-under=90
-python -m build --no-isolation
-```
+   ```bash
+   git pull --ff-only
+   python scripts/release_check.py
+   git tag -a v<version> -m "python-mcp-bootstrap v<version>"
+   git push origin v<version>
+   ```
 
-Then create the annotated tag and the GitHub release:
+3. Prepare the draft. This builds with the pinned backend, writes
+   `SHA256SUMS`, creates or reuses a **draft** release, uploads the assets,
+   attests provenance, signs every artifact, and re-runs the release check
+   against the draft. It never publishes the release and never talks to PyPI.
 
-```bash
-git tag -a v<version> -m "python-mcp-bootstrap v<version>"
-git push origin v<version>
-gh release create v<version> --notes-file docs/releases/<version>.md
-```
+   ```bash
+   gh workflow run prepare-release.yml --ref main -f tag=v<version>
+   gh run watch <run-id>
+   gh release view v<version> --json isDraft,assets \
+     --jq '{draft:.isDraft, assets:[.assets[].name]}'
+   ```
 
-Publishing the release triggers the workflow, which:
+   The draft must have exactly seven assets: wheel, sdist, `SHA256SUMS`, three
+   `.sigstore.json` bundles, and `provenance.intoto.jsonl`.
 
-1. rebuilds the wheel and sdist from the tagged tree with the pinned backend
-   (`python -m build --no-isolation`),
-2. writes `dist/SHA256SUMS`,
-3. uploads the wheel, sdist and `SHA256SUMS` to the release,
-4. attests build provenance and writes `dist/provenance.intoto.jsonl`,
-5. signs every artifact with Sigstore (`.sigstore.json`) and uploads the
-   bundles plus the provenance file,
-6. re-runs `python scripts/release_check.py --tag v<version>` as the final gate
-   (it downloads the assets and verifies the checksums, signatures and
-   provenance are present),
-7. publishes to PyPI with OIDC trusted publishing.
+4. Verify the draft before flipping it:
 
-Do not hand-attach assets and do not create a release before the checks above
-pass. If a step fails before PyPI publishing, fix and re-run the workflow
-(`gh workflow run publish.yml -f tag=v<version>`); the version is not consumed
-until PyPI accepts it. Tags stay deliberately unsigned: artifact signatures and
-provenance live in the release assets, and a tag is not a signature.
+   ```bash
+   gh release download v<version> --dir /tmp/release-check \
+     --pattern '*.whl' --pattern '*.tar.gz' --pattern SHA256SUMS
+   (cd /tmp/release-check && sha256sum -c SHA256SUMS)
+   gh attestation verify /tmp/release-check/*.whl \
+     --repo 4zhmv6zvj2-afk/python-mcp-bootstrap
+   python scripts/release_check.py --tag v<version>
+   ```
+
+   Do not publish on partial success.
+
+5. Publish the draft. This is irreversible: it makes the release immutable and
+   locks the tag.
+
+   ```bash
+   gh release edit v<version> --draft=false --latest
+   ```
+
+   Publishing fires `publish.yml`, which downloads the published assets,
+   verifies checksums, signatures and provenance, runs the final
+   `release_check --tag`, and only then publishes to PyPI under the `pypi`
+   environment. It has no permission to modify release assets.
+
+6. Never hand-attach assets, never publish a draft before every check passes,
+   and do not edit a published release: GitHub refuses asset changes there. If
+   a step fails before PyPI, fix and re-run the workflow; the version is not
+   consumed until PyPI accepts it. If PyPI accepts and something later fails,
+   the next version fixes it.
+
+`sign-release.yml` remains for mutable or draft releases created outside this
+flow; it cannot modify an immutable release.
 
 ## Scope
 
