@@ -69,8 +69,10 @@ Releases are draft-first because GitHub release immutability is enabled: assets
 cannot be attached after a release is published. Build and attach them while
 the release is still a draft, verify, then publish the draft.
 
-1. Merge the version bump (`pyproject.toml`, `__init__.py`, the changelog entry
-   and `docs/releases/<version>.md`) to `main` with all checks green.
+1. Merge the version bump — the `__version__` in
+   `src/python_mcp_bootstrap/__init__.py` (there is no version in
+   `pyproject.toml`) — plus the changelog entry and
+   `docs/releases/<version>.md` to `main` with all checks green.
 2. From a clean `main`, run the release check and create the annotated tag:
 
    ```bash
