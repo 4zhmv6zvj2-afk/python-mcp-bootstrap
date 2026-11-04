@@ -24,12 +24,13 @@ it. If you are a developer adding it to an app, jump to
 This helper runs before an app's dependencies exist, which means it executes
 during someone else's setup. A tool in that position should be inspectable
 rather than trusted on faith: the source is MIT-licensed, the PyPI wheel and
-sdist are the same code published from this repository, and every release is
-checksummed, signed and attested (see
-[release verification](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/blob/main/README.md#for-developers)). It has no telemetry, no
-runtime dependency on the MCP SDK, and no network access except the interpreter
-download you explicitly approve. If you only want to run an MCP app, you do not
-need this repository; the app's setup pulls it in.
+sdist are the same code published from this repository, and releases from
+`v0.1.2` onward are checksummed, signed and attested (see
+[release verification](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/blob/main/README.md#verifying-releases)).
+It makes no network calls of its own, has no telemetry, and has no runtime
+dependency on the MCP SDK. After you pass `--install-python`, provisioning runs
+`uv` to download the pinned interpreter and install the app's dependencies from
+the package index you configured.
 
 ## Do I need this?
 
@@ -100,6 +101,8 @@ permanently reserves the filenames of a deleted release, and an earlier
 iteration of this repository had published and removed that version. `v0.1.4`
 was skipped for the same filename reason. `0.1.5` is the current installable
 release, and `pip install python-mcp-bootstrap` resolves to it.
+
+### Verifying releases
 
 To verify a download:
 
