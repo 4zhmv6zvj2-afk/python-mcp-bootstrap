@@ -125,6 +125,9 @@ def _install_fake_gh(
         encoding="utf-8",
     )
     monkeypatch.setenv("FAKE_GH_STATE", str(state))
+    # An extracted sdist has no git remote; pin the slug so these tests are
+    # independent of the checkout.
+    monkeypatch.setenv("GITHUB_REPOSITORY", "owner/repo")
     monkeypatch.setattr(release_check.shutil, "which", lambda _name: str(script))
 
 
