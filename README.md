@@ -99,8 +99,9 @@ Version history as users see it on PyPI:
 `v0.1.1` was tagged but never published. `v0.1.3` exists on GitHub only: PyPI
 permanently reserves the filenames of a deleted release, and an earlier
 iteration of this repository had published and removed that version. `v0.1.4`
-was skipped for the same filename reason. `0.1.5` is the current installable
-release, and `pip install python-mcp-bootstrap` resolves to it.
+was skipped for the same filename reason. `0.1.5` is the first installable
+release after `0.1.2`, and `pip install python-mcp-bootstrap` resolves to the
+newest release.
 
 ### Verifying releases
 
