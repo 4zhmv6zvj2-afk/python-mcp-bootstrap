@@ -428,6 +428,25 @@ def _failed(reason: str, spec: BootstrapSpec, **extra: object) -> dict[str, Any]
     return payload
 
 
+def _verification_failure(
+    python: Path, spec: BootstrapSpec, found: Version, *, override: bool
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "ok": False,
+        "installed": False,
+        "app": spec.app,
+        "reason": "verify_import_failed",
+        "interpreter": str(python),
+        "python_version": format_version(found),
+        "required": f">={floor_text(spec.required)}",
+        "pin": spec.pin,
+        "detail": f"cannot import {spec.verify_import!r} from this interpreter",
+    }
+    if override:
+        payload["override"] = True
+    return payload
+
+
 def _needs_install(python: Path, spec: BootstrapSpec, found: Version) -> dict[str, Any]:
     return {
         "ok": False,
@@ -585,7 +604,20 @@ def _exec(
     env = dict(os.environ)
     env[spec.env_var] = str(python)
     argv = [str(python), str(Path(root) / spec.entrypoint), *args]
-    result = exec_fn(str(python), argv, env)
+    try:
+        result = exec_fn(str(python), argv, env)
+    except OSError as exc:
+        return _report(
+            {
+                "ok": False,
+                "installed": False,
+                "app": spec.app,
+                "reason": "exec_failed",
+                "interpreter": str(python),
+                "detail": _redact(str(exc)),
+            },
+            8,
+        )
     return int(result or 0)
 
 
@@ -719,9 +751,18 @@ def bootstrap(
             return _report(
                 _too_old(format_version(found) if found else None, spec, override=True), 3
             )
-        return _exec(exec_fn, Path(override), root, spec, cleaned)
+        override_path = Path(override)
+        if spec.verify_import is not None and not _installed(
+            override_path, spec, root, dict(os.environ), run
+        ):
+            return _report(_verification_failure(override_path, spec, found, override=True), 5)
+        return _exec(exec_fn, override_path, root, spec, cleaned)
 
-    if running >= spec.required:
+    running_has_app = True
+    if running >= spec.required and spec.verify_import is not None:
+        running_has_app = _installed(Path(sys.executable), spec, root, dict(os.environ), run)
+
+    if running >= spec.required and running_has_app:
         if continuation is not None:
             os.environ[spec.env_var] = sys.executable
             return continuation(cleaned)
@@ -743,6 +784,8 @@ def bootstrap(
     if not consent:
         if broken_venv is not None:
             return _report(_needs_install(broken_venv[0], spec, broken_venv[1]), 6)
+        if running >= spec.required and spec.verify_import is not None:
+            return _report(_needs_install(Path(sys.executable), spec, running), 6)
         return _report(
             _too_old(
                 format_version(running),
