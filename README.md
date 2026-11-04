@@ -216,11 +216,15 @@ python -m build
 
 CI targets Python 3.14.10 and 3.15.2 on Ubuntu and Windows, plus a 3.12
 compatibility job, a wheel/release gate, and the vendored example first run.
-`main` is protected: the release gate, the 3.12 job, and the vendored example
-run are required before a merge, and force-pushes and deletions are blocked.
+`main` is protected: the release gate, the 3.12 job, the vendored example
+run, and the CodeQL analysis jobs are required before a merge, and
+force-pushes and deletions are blocked.
 The macOS 15 job (`.github/workflows/macos.yml`) runs the same suite on pushes
 to `main`, on tags, and weekly, but not on pull requests: GitHub's macOS arm64
-pool is capacity-constrained and must not gate merges.
+pool is capacity-constrained and must not gate merges. An extracted-sdist suite
+(job `sdist-suite`) runs on every pull request and checks that the sdist's own
+bundled tests pass; it is not a required branch-protection check, so read the
+run rather than the badge.
 
 ## License
 

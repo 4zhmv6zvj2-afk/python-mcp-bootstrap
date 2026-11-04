@@ -36,14 +36,18 @@ python scripts/vendor.py --target examples --dest _vendor/python_mcp_bootstrap.p
 
 ## CI status
 
-`main` is protected. The wheel/release gate, the Python 3.12 import job, and
-the vendored example run are required status checks before a pull request
-merges, and force-pushes and branch deletions are blocked.
+`main` is protected. The wheel/release gate, the Python 3.12 import job, the
+vendored example run, and the CodeQL analysis jobs (`Analyze (python)`,
+`Analyze (actions)`) are required status checks before a pull request merges,
+and force-pushes and branch deletions are blocked.
 
 The 3.14/3.15 matrix runs alongside those required jobs, but it is not a
 required check, so read the run rather than the badge: a queued Windows cell is
 not green. macOS runs on `main`, tags and a weekly schedule, not on pull
-requests. A green tag run is the strongest evidence for a release.
+requests. An extracted-sdist suite (job `sdist-suite`) runs on every pull
+request and verifies that the sdist's bundled tests pass, but it is not a
+required branch-protection check; read that run too. A green tag run is the
+strongest evidence for a release.
 
 ## Tests for new functionality
 
