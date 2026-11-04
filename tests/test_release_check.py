@@ -22,6 +22,8 @@ from scripts.release_check import (
     package_version,
 )
 
+from python_mcp_bootstrap import core as bootstrap_core
+
 
 def _local_tag_is_annotated(tag: str) -> bool:
     """Return whether ``tag`` exists locally as an annotated tag object.
@@ -506,3 +508,61 @@ def test_main_reports_failures_and_success(
     monkeypatch.setattr(release_check, "check", lambda **_kwargs: [])
     assert release_check.main(["--allow-dirty"]) == 0
     assert "release check: ok" in capsys.readouterr().out
+
+
+def test_core_constants_are_read_from_the_source() -> None:
+    constants = release_check._core_constants(ROOT / "src" / "python_mcp_bootstrap" / "core.py")
+    assert constants == (bootstrap_core.PIN, bootstrap_core.REQUIRED)
+
+
+def test_core_constants_missing_is_reported(tmp_path: Path) -> None:
+    core_path = tmp_path / "core.py"
+    core_path.write_text("PIN = 1\n", encoding="utf-8")
+    assert release_check._core_constants(core_path) is None
+
+
+def _release_tree(root: Path) -> None:
+    package = root / "src" / "python_mcp_bootstrap"
+    package.mkdir(parents=True)
+    (package / "__init__.py").write_text('__version__ = "0.1.0"\n', encoding="utf-8")
+    (package / "core.py").write_text(
+        'PIN = "3.15.2"\nREQUIRED: Version = (3, 14, 0)\n', encoding="utf-8"
+    )
+    (root / "pyproject.toml").write_text(
+        "[project]\n"
+        'name = "python-mcp-bootstrap"\n'
+        'dynamic = ["version"]\n'
+        'requires-python = ">=3.14"\n'
+        'license = "MIT"\n'
+        "\n[tool.hatch.version]\n"
+        'path = "src/python_mcp_bootstrap/__init__.py"\n',
+        encoding="utf-8",
+    )
+    (root / ".python-version").write_text("3.15.2\n", encoding="utf-8")
+    (root / "CHANGELOG.md").write_text("# Changelog\n\n## 0.1.0 — 2026-01-01\n", encoding="utf-8")
+    notes = root / "docs" / "releases"
+    notes.mkdir(parents=True)
+    (notes / "0.1.0.md").write_text("notes\n", encoding="utf-8")
+    (root / "docs" / "integration.md").write_text("", encoding="utf-8")
+    (root / "LICENSE").write_text("MIT License\n", encoding="utf-8")
+    scripts = root / "scripts"
+    scripts.mkdir()
+    (scripts / "vendor.py").write_text("", encoding="utf-8")
+
+
+def test_check_fails_when_pin_file_disagrees_with_core(tmp_path: Path) -> None:
+    _release_tree(tmp_path)
+    (tmp_path / ".python-version").write_text("9.9.9\n", encoding="utf-8")
+
+    failures = check(tmp_path, allow_dirty=True)
+    assert any("python pin is not 3.15.2" in failure for failure in failures)
+
+
+def test_check_reports_unreadable_core_constants(tmp_path: Path) -> None:
+    _release_tree(tmp_path)
+    (tmp_path / "src" / "python_mcp_bootstrap" / "core.py").write_text(
+        "undefined = True\n", encoding="utf-8"
+    )
+
+    failures = check(tmp_path, allow_dirty=True)
+    assert any("cannot read PIN and REQUIRED" in failure for failure in failures)
