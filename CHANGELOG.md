@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.1.4 — 2026-11-05
+
+Re-release of 0.1.3 under a new version number. The code is identical to
+0.1.3; the only differences are the version string and this entry.
+
+PyPI permanently blocks the `0.1.3` filenames. A file named
+`python_mcp_bootstrap-0.1.3-py3-none-any.whl`/`.tar.gz` was previously
+uploaded and deleted outside this repository's release pipeline, and PyPI does
+not allow a filename to be reused after deletion. The `v0.1.3` GitHub release
+therefore stays a GitHub-only release with verified assets (wheel, sdist,
+`SHA256SUMS`, three Sigstore signature bundles and build provenance); it was
+never published to PyPI. `0.1.4` is the installable equivalent.
+
+See the 0.1.3 section for the actual changes: the extracted-sdist suite fix,
+the install-argument ordering fix, and the pipeline and documentation
+corrections. Users upgrading from the PyPI 0.1.2 artifacts get all of those,
+including an sdist whose bundled tests pass.
+
 ## 0.1.3 — 2026-11-05
 
 Patch release: the first sdist whose bundled test suite passes, plus a
