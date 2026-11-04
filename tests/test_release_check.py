@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -36,7 +37,8 @@ def _local_tag_is_annotated(tag: str) -> bool:
 
 
 def test_package_version_matches_the_release() -> None:
-    assert package_version(ROOT) == "0.1.0"
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    assert package_version(ROOT) == project["project"]["version"]
 
 
 def test_current_tree_is_release_ready() -> None:
@@ -44,12 +46,12 @@ def test_current_tree_is_release_ready() -> None:
 
 
 @pytest.mark.skipif(
-    not _local_tag_is_annotated("v0.1.0"),
-    reason="local v0.1.0 is absent or not annotated; CI restores it after checkout",
+    not _local_tag_is_annotated(f"v{package_version(ROOT)}"),
+    reason="release tag is absent or not annotated; CI restores it after checkout",
 )
 def test_matching_release_tag_passes(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(release_check, "_release_asset_errors", lambda *_args: [])
-    assert check(ROOT, allow_dirty=True, tag="v0.1.0") == []
+    assert check(ROOT, allow_dirty=True, tag=f"v{package_version(ROOT)}") == []
 
 
 def test_mismatched_release_tag_fails() -> None:
