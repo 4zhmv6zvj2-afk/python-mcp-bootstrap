@@ -40,3 +40,13 @@ def test_publish_requires_a_published_immutable_release() -> None:
     assert "still a draft" in text
     assert "not immutable" in text
     assert "immutable" in text
+
+
+def test_prepare_release_detects_existing_drafts() -> None:
+    """gh release view cannot see drafts; the list endpoint must be used."""
+
+    text = _workflow("prepare-release.yml")
+
+    assert "gh release view" not in text
+    assert "releases?per_page=100" in text
+    assert "select(.tag_name" in text
