@@ -50,6 +50,21 @@ class RunRecorder:
         return [" ".join(call[0]) for call in self.calls]
 
 
+class UvVersionRunner(RunRecorder):
+    """Report a uv version for --version and fail every other command."""
+
+    def __init__(self, version: str) -> None:
+        super().__init__()
+        self.version = version
+
+    def __call__(
+        self, command: list[str], cwd: Path, env: dict[str, str], timeout: int
+    ) -> dict[str, Any]:
+        if command[1:] == ["--version"]:
+            return {"returncode": 0, "stdout": f"uv {self.version}\n", "stderr": ""}
+        return {"returncode": 1, "stdout": "", "stderr": "No download found"}
+
+
 class ScriptedRunner(RunRecorder):
     def __init__(self, returncodes: list[int]) -> None:
         super().__init__()
@@ -153,6 +168,44 @@ def test_exec_oserror_becomes_a_json_report(
     assert report["reason"] == "exec_failed"
     assert "interpreter vanished" in report["detail"]
     assert "Traceback" not in captured.err
+
+
+def test_old_uv_failure_includes_an_upgrade_tip(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code = bootstrap(
+        ["--install-python"],
+        tmp_path,
+        _spec(),
+        run=UvVersionRunner("0.11.27"),
+        current=(3, 12, 13),
+        probe=lambda _exe: None,
+        uv="/fake/uv",
+    )
+
+    report = json.loads(capsys.readouterr().out)
+    assert code == 5
+    assert report["reason"] == "provision_failed"
+    assert "0.11.27" in report["tip"]
+    assert "uv self update" in report["tip"]
+
+
+def test_recent_uv_failure_has_no_upgrade_tip(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code = bootstrap(
+        ["--install-python"],
+        tmp_path,
+        _spec(),
+        run=UvVersionRunner("0.13.7"),
+        current=(3, 12, 13),
+        probe=lambda _exe: None,
+        uv="/fake/uv",
+    )
+
+    report = json.loads(capsys.readouterr().out)
+    assert code == 5
+    assert "tip" not in report
 
 
 def test_below_floor_without_consent_stops_before_any_subprocess(
