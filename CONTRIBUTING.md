@@ -36,9 +36,10 @@ python scripts/vendor.py --target examples --dest _vendor/python_mcp_bootstrap.p
 
 ## CI status
 
-`main` is protected. The wheel/release gate, the Python 3.12 import job, and
-the vendored example run are required status checks before a pull request
-merges, and force-pushes and branch deletions are blocked.
+`main` is protected. The wheel/release gate, the Python 3.12 import job, the
+vendored example run, and the CodeQL analysis jobs (`Analyze (python)`,
+`Analyze (actions)`) are required status checks before a pull request merges,
+and force-pushes and branch deletions are blocked.
 
 The 3.14/3.15 matrix runs alongside those required jobs, but it is not a
 required check, so read the run rather than the badge: a queued Windows cell is
