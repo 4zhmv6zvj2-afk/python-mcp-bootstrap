@@ -67,8 +67,10 @@ jobs:
         shell: bash
         run: |
           VERSION="${TAG#v}"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            draft=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.draft')
+          # The single-release endpoint cannot see drafts; list releases instead.
+          draft=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --paginate \
+            --jq ".[] | select(.tag_name==\"${TAG}\") | .draft" | head -n 1)
+          if [ -n "$draft" ]; then
             if [ "$draft" != "true" ]; then
               echo "::error::release $TAG is already published; refusing to modify it"
               exit 1
