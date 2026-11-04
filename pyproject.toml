@@ -73,7 +73,7 @@ pythonpath = ["src", "."]
 
 [tool.coverage.run]
 branch = true
-source = ["python_mcp_bootstrap"]
+source = ["python_mcp_bootstrap", "scripts"]
 
 [tool.coverage.report]
 show_missing = true
@@ -102,4 +102,4 @@ python_version = "3.12"
 strict = true
 warn_unreachable = true
 show_error_codes = true
-files = ["src"]
+files = ["src", "scripts"]

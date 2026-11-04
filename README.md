@@ -207,7 +207,7 @@ Requires Python 3.14+. The development pin is 3.15.2.
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install -e '.[dev]'
-python -m pytest --cov=python_mcp_bootstrap --cov-fail-under=90
+python -m pytest --cov --cov-fail-under=90
 python -m ruff format --check
 python -m ruff check
 python -m mypy

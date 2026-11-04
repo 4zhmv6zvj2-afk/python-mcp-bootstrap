@@ -293,7 +293,7 @@ def check(root: Path = ROOT, *, allow_dirty: bool = False, tag: str | None = Non
     if pyproject_path.is_file():
         try:
             data = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
-            project = data.get("project", {})  # type: ignore[assignment]
+            project = data.get("project", {})
         except (OSError, tomllib.TOMLDecodeError) as exc:
             failures.append(f"unreadable pyproject.toml: {exc}")
 

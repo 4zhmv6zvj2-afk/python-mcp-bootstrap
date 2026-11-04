@@ -15,7 +15,7 @@ python -m pip install -e '.[dev]'
 Run all four before proposing a change:
 
 ```bash
-python -m pytest --cov=python_mcp_bootstrap --cov-fail-under=90
+python -m pytest --cov --cov-fail-under=90
 python -m ruff format --check
 python -m ruff check
 python -m mypy
