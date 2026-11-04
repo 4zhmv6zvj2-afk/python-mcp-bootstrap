@@ -106,7 +106,7 @@ def test_python_override_that_cannot_import_the_app_fails_verification(
     assert code == 5
     assert report["reason"] == "verify_import_failed"
     assert report["override"] is True
-    assert report["interpreter"] == "/opt/other-python"
+    assert report["interpreter"] == str(Path("/opt/other-python"))
     assert execs.calls == []
 
 
