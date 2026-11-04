@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.1.5 — 2026-11-05
+
+First installable release after PyPI 0.1.2. The code is identical to 0.1.3;
+only the version string differs.
+
+An earlier iteration of this repository published 0.1.3 and 0.1.4 through
+trusted publishing. Those releases were deleted when the repository history
+was replaced, and PyPI permanently reserves the filenames of deleted releases.
+As a result:
+
+- `v0.1.3` remains a GitHub-only release with its verified assets (wheel,
+  sdist, `SHA256SUMS`, three Sigstore signature bundles and build provenance);
+  it was never published to PyPI.
+- The `0.1.4` version number cannot be uploaded either, so it is skipped
+  entirely.
+- `0.1.5` is the first version whose filenames are free, which is why the
+  number jumps from 0.1.2 on PyPI.
+
+See the 0.1.3 section for the actual changes: the extracted-sdist suite fix,
+the install-argument ordering fix, and the pipeline and documentation
+corrections. Users upgrading from the PyPI 0.1.2 artifacts get all of those,
+including an sdist whose bundled tests pass.
+
 ## 0.1.3 — 2026-11-05
 
 Patch release: the first sdist whose bundled test suite passes, plus a

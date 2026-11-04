@@ -129,6 +129,11 @@ the release is still a draft, verify, then publish the draft.
 `sign-release.yml` remains for mutable or draft releases created outside this
 flow; it cannot modify an immutable release.
 
+Never upload test artifacts to real PyPI: a deleted release permanently
+reserves its filenames, so a rehearsal upload can burn a version number for
+good. Use TestPyPI for upload rehearsals and the draft-first flow above for
+real releases.
+
 ## Scope
 
 The core owns interpreter selection, consent, provisioning, verification, and
