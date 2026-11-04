@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.1.3 — 2026-11-05
+
+Patch release: the first sdist whose bundled test suite passes, plus a
+structural fix to install-argument ordering.
+
+### Fixed
+
+- The `v0.1.2` sdist could not run its own test suite. It omitted
+  `requirements-ci.txt` and `requirements-build.txt`, and
+  `tests/test_workflows.py` read `.github/workflows` even outside a repository
+  checkout. The sdist now ships both pinned requirement files,
+  repository-only workflow tests skip when `.github/` is absent, and CI runs
+  the extracted-sdist suite so this cannot regress. `v0.1.3` is the first
+  sdist whose bundled tests pass; users of the `v0.1.2` sdist should upgrade.
+- Install-argument ordering: the provisioning command is now
+  `uv pip install --python <venv python> <install_args>`, so a trailing
+  consumer-supplied flag can no longer swallow the appended interpreter
+  argument. The `install_args` validation rules are unchanged.
+
+### Pipeline
+
+- `publish.yml` verifies build provenance for the sdist as well as the wheel.
+- CI builds the wheel and sdist with `--no-isolation` using the pinned backend,
+  matching the release build instead of silently re-resolving.
+- Removed the dead wait loop from `release-gate.yml`: assets exist before
+  publication now, so the gate verifies immediately.
+
+### Docs
+
+- README and CONTRIBUTING corrections: `v0.1.2` is named as the first release
+  with provenance, and macOS is documented as running on `main`, tags and a
+  weekly schedule rather than on pull requests.
+
 ## 0.1.2 — 2026-11-05
 
 First published release of the hardened 0.1.x line. `v0.1.1` was tagged but
@@ -58,8 +91,6 @@ under a fresh tag. The `v0.1.1` tag is kept as history only.
 ## 0.1.1 — 2026-11-05
 
 Tagged but never published (see 0.1.2). Kept in the changelog for the record.
-
-## 0.1.1 — 2026-11-05
 
 Patch release: behavior fixes and a release pipeline that produces verified,
 checksummed, signed artifacts.
