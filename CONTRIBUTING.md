@@ -134,6 +134,15 @@ reserves its filenames, so a rehearsal upload can burn a version number for
 good. Use TestPyPI for upload rehearsals and the draft-first flow above for
 real releases.
 
+Before tagging, confirm the version has never been uploaded: with project
+owner access, open the project's Manage → History page and check that no
+`Version <x.y.z> created` row exists. PyPI permanently reserves filenames
+from deleted releases, and
+`https://pypi.org/pypi/<project>/<version>/json` returns 404 both for a
+version that was never published and for one whose release was deleted, so
+History is the only reliable check. If a row exists, use the next free
+version number instead.
+
 ## Scope
 
 The core owns interpreter selection, consent, provisioning, verification, and

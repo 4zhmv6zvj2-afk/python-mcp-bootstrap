@@ -3,7 +3,7 @@
 ## 0.1.5 — 2026-11-05
 
 First installable release after PyPI 0.1.2. The code is identical to 0.1.3;
-only the version string differs.
+only the version string and documentation differ.
 
 An earlier iteration of this repository published 0.1.3 and 0.1.4 through
 trusted publishing. Those releases were deleted when the repository history
