@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import os
 import sys
+from dataclasses import FrozenInstanceError
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -332,6 +333,42 @@ def test_spec_allows_project_local_install_args() -> None:
 def test_spec_rejects_a_bare_string_install_args() -> None:
     with pytest.raises(ValueError, match="install_args"):
         BootstrapSpec(app="example-mcp", install_args="-e .")  # type: ignore[arg-type]
+
+
+def test_spec_copies_install_args_and_required_to_tuples() -> None:
+    """Callers may pass lists; the frozen spec must not retain them."""
+
+    install_args = ["-e", "."]
+    required = [3, 14, 0]
+    spec = BootstrapSpec(
+        app="example-mcp",
+        install_args=install_args,  # type: ignore[arg-type]
+        required=required,  # type: ignore[arg-type]
+    )
+
+    assert spec.install_args == ("-e", ".")
+    assert spec.required == (3, 14, 0)
+
+    install_args.append("--system")
+    required.append(99)
+    assert spec.install_args == ("-e", ".")
+    assert spec.required == (3, 14, 0)
+
+
+def test_spec_is_frozen_after_construction() -> None:
+    spec = BootstrapSpec(app="example-mcp")
+
+    with pytest.raises(FrozenInstanceError):
+        spec.install_args = ("--system",)  # type: ignore[misc]
+
+
+@pytest.mark.parametrize(
+    "bad_required",
+    [(3, 14), ("3", 14, 0), (3, 14, True), "314", 314],
+)
+def test_spec_rejects_a_bad_required(bad_required: object) -> None:
+    with pytest.raises(ValueError, match="required"):
+        BootstrapSpec(app="example-mcp", required=bad_required)  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize(

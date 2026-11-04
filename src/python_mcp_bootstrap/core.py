@@ -16,7 +16,7 @@ import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path, PureWindowsPath
-from typing import Any
+from typing import Any, cast
 
 Version = tuple[int, int, int]
 Main = Callable[[list[str]], int]
@@ -83,8 +83,7 @@ class BootstrapSpec:
             _require_project_path(field, value)
         if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", self.env_var) is None:
             raise ValueError(f"env_var is not a valid environment name: {self.env_var!r}")
-        if len(self.required) != 3 or any(not isinstance(part, int) for part in self.required):
-            raise ValueError(f"required is not a version: {self.required!r}")
+        object.__setattr__(self, "required", _spec_required(self.required))
         if re.fullmatch(r"\d+(?:\.\d+){0,2}", self.pin) is None:
             raise ValueError(f"pin must be a plain version: {self.pin!r}")
         pin_version = version_tuple(self.pin)
@@ -94,11 +93,38 @@ class BootstrapSpec:
             raise ValueError(f"pin {self.pin!r} is older than required {self.required!r}")
         if self.verify_import is not None and not _valid_module(self.verify_import):
             raise ValueError(f"verify_import is not a module: {self.verify_import!r}")
-        _require_project_install_args(self.install_args)
+        object.__setattr__(self, "install_args", _spec_install_args(self.install_args))
         if not self.repair_card.strip():
             raise ValueError("repair_card must not be empty")
         if self.card == CARD and self.pin != PIN:
             object.__setattr__(self, "card", CARD_TEMPLATE.format(pin=self.pin))
+
+
+def _spec_required(values: object) -> Version:
+    """Return ``values`` as a validated version tuple.
+
+    Accepting a list keeps the constructor friendly; storing a tuple keeps the
+    frozen dataclass actually immutable after validation.
+    """
+
+    if isinstance(values, str) or not isinstance(values, (tuple, list)):
+        raise ValueError(f"required is not a version: {values!r}")
+    parts = tuple(values)
+    if len(parts) != 3 or any(
+        not isinstance(part, int) or isinstance(part, bool) for part in parts
+    ):
+        raise ValueError(f"required is not a version: {values!r}")
+    return cast("Version", parts)
+
+
+def _spec_install_args(values: object) -> tuple[str, ...]:
+    """Return ``values`` as a validated, immutable install-argument tuple."""
+
+    if isinstance(values, str) or not isinstance(values, (tuple, list)):
+        raise ValueError(f"install_args must be a sequence of strings: {values!r}")
+    items = tuple(values)
+    _require_project_install_args(items)
+    return cast("tuple[str, ...]", items)
 
 
 def _valid_module(value: str) -> bool:
