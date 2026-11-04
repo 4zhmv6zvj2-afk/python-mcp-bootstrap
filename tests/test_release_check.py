@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 from scripts import release_check
 from scripts.release_check import (
     ROOT,
+    _checksum_errors,
     _release_asset_errors,
     _tag_problem,
     check,
@@ -89,31 +89,80 @@ def test_release_asset_check_skips_without_gh(
 
 def test_release_asset_check_reports_missing_assets(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(release_check.shutil, "which", lambda _name: "/fake/gh")
-    result = SimpleNamespace(
-        returncode=0,
-        stdout="python_mcp_bootstrap-0.1.0-py3-none-any.whl\nSHA256SUMS\n",
-        stderr="",
+    monkeypatch.setattr(
+        release_check,
+        "_asset_names",
+        lambda *_args: {"python_mcp_bootstrap-0.1.0-py3-none-any.whl", "SHA256SUMS"},
     )
-    monkeypatch.setattr(release_check.subprocess, "run", lambda *_args, **_kwargs: result)
 
     errors = _release_asset_errors(ROOT, "v0.1.0", "0.1.0")
     assert any("tar.gz" in error for error in errors)
 
 
-def test_release_asset_check_accepts_full_assets(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_release_asset_check_requires_signatures_and_provenance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(release_check.shutil, "which", lambda _name: "/fake/gh")
-    result = SimpleNamespace(
-        returncode=0,
-        stdout=(
-            "python_mcp_bootstrap-0.1.0-py3-none-any.whl\n"
-            "python_mcp_bootstrap-0.1.0.tar.gz\n"
-            "SHA256SUMS\n"
-        ),
-        stderr="",
+    monkeypatch.setattr(
+        release_check,
+        "_asset_names",
+        lambda *_args: {
+            "python_mcp_bootstrap-0.1.0-py3-none-any.whl",
+            "python_mcp_bootstrap-0.1.0.tar.gz",
+            "SHA256SUMS",
+        },
     )
-    monkeypatch.setattr(release_check.subprocess, "run", lambda *_args, **_kwargs: result)
+
+    errors = _release_asset_errors(ROOT, "v0.1.0", "0.1.0")
+    assert any("sigstore.json" in error for error in errors)
+    assert any("provenance.intoto.jsonl" in error for error in errors)
+
+
+def test_release_asset_check_accepts_full_assets(monkeypatch: pytest.MonkeyPatch) -> None:
+    wheel = "python_mcp_bootstrap-0.1.0-py3-none-any.whl"
+    sdist = "python_mcp_bootstrap-0.1.0.tar.gz"
+    monkeypatch.setattr(release_check.shutil, "which", lambda _name: "/fake/gh")
+    monkeypatch.setattr(
+        release_check,
+        "_asset_names",
+        lambda *_args: {
+            wheel,
+            sdist,
+            "SHA256SUMS",
+            f"{wheel}.sigstore.json",
+            f"{sdist}.sigstore.json",
+            "SHA256SUMS.sigstore.json",
+            "provenance.intoto.jsonl",
+        },
+    )
+    monkeypatch.setattr(release_check, "_download_assets", lambda *_args: None)
+    monkeypatch.setattr(release_check, "_checksum_errors", lambda *_args: [])
 
     assert _release_asset_errors(ROOT, "v0.1.0", "0.1.0") == []
+
+
+def test_checksum_errors_accept_matching_files(tmp_path: Path) -> None:
+    wheel = tmp_path / "python_mcp_bootstrap-0.1.0-py3-none-any.whl"
+    sdist = tmp_path / "python_mcp_bootstrap-0.1.0.tar.gz"
+    wheel.write_bytes(b"wheel")
+    sdist.write_bytes(b"sdist")
+    lines = []
+    for artifact in (wheel, sdist):
+        digest = release_check._sha256(artifact)
+        lines.append(f"{digest}  {artifact.name}")
+    (tmp_path / "SHA256SUMS").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    assert _checksum_errors(tmp_path, "0.1.0") == []
+
+
+def test_checksum_errors_detect_mismatch_and_missing(tmp_path: Path) -> None:
+    wheel = tmp_path / "python_mcp_bootstrap-0.1.0-py3-none-any.whl"
+    wheel.write_bytes(b"tampered")
+    (tmp_path / "SHA256SUMS").write_text(f"{'0' * 64}  {wheel.name}\n", encoding="utf-8")
+
+    errors = _checksum_errors(tmp_path, "0.1.0")
+    assert any("digest mismatch" in error for error in errors)
+    assert any("tar.gz" in error for error in errors)
 
 
 def test_check_requires_a_notes_file(tmp_path: Path) -> None:

@@ -11,10 +11,13 @@ from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
+import time
 import tomllib
 from pathlib import Path
 
@@ -70,17 +73,17 @@ def _tag_problem(root: Path, tag: str) -> str | None:
     return None
 
 
-def _release_asset_errors(root: Path, tag: str, version: str) -> list[str]:
-    """Check the GitHub release assets when gh is available.
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
-    A tag build may run before the release is created; that is reported as a
-    skip, not a failure.  A readable release with missing assets fails.
-    """
 
-    gh = shutil.which("gh")
-    if gh is None:
-        print("release check: gh not found; skipping GitHub release asset check", file=sys.stderr)
-        return []
+def _asset_names(root: Path, gh: str, tag: str) -> set[str] | None:
+    """Return the published asset names, or None when the release is not readable."""
+
     result = subprocess.run(
         [gh, "release", "view", tag, "--json", "assets", "--jq", ".assets[].name"],
         cwd=str(root),
@@ -92,14 +95,106 @@ def _release_asset_errors(root: Path, tag: str, version: str) -> list[str]:
         print(
             f"release check: release {tag!r} is not readable; skipping asset check", file=sys.stderr
         )
+        return None
+    return set(result.stdout.split())
+
+
+def _download_assets(root: Path, gh: str, tag: str, dest: Path) -> str | None:
+    """Download the checksummed artifacts; retry briefly for asset propagation."""
+
+    for attempt in range(4):
+        result = subprocess.run(
+            [
+                gh,
+                "release",
+                "download",
+                tag,
+                "--pattern",
+                "SHA256SUMS",
+                "--pattern",
+                "*.whl",
+                "--pattern",
+                "*.tar.gz",
+                "--dir",
+                str(dest),
+            ],
+            cwd=str(root),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode == 0:
+            return None
+        if attempt < 3:
+            time.sleep(3)
+    return f"release {tag!r} assets could not be downloaded"
+
+
+def _checksum_errors(dest: Path, version: str) -> list[str]:
+    """Verify SHA256SUMS names every artifact and matches its bytes."""
+
+    errors: list[str] = []
+    wheel = f"python_mcp_bootstrap-{version}-py3-none-any.whl"
+    sdist = f"python_mcp_bootstrap-{version}.tar.gz"
+    sums = dest / "SHA256SUMS"
+    if not sums.is_file():
+        return ["release asset check: SHA256SUMS was not downloaded"]
+    listed: set[str] = set()
+    for line in sums.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        parts = line.split()
+        if len(parts) != 2:
+            errors.append(f"release asset check: malformed SHA256SUMS line {line!r}")
+            continue
+        digest, name = parts
+        listed.add(name)
+        artifact = dest / name
+        if not artifact.is_file():
+            errors.append(f"release asset check: SHA256SUMS names missing asset {name}")
+        elif _sha256(artifact) != digest:
+            errors.append(f"release asset check: digest mismatch for {name}")
+    for name in (wheel, sdist):
+        if name not in listed:
+            errors.append(f"release asset check: SHA256SUMS does not list {name}")
+    return errors
+
+
+def _release_asset_errors(root: Path, tag: str, version: str) -> list[str]:
+    """Check the GitHub release assets when gh is available.
+
+    A tag build may run before the release is created; that is reported as a
+    skip, not a failure.  A readable release with missing assets, mismatched
+    digests, or without signatures/provenance fails.
+    """
+
+    gh = shutil.which("gh")
+    if gh is None:
+        print("release check: gh not found; skipping GitHub release asset check", file=sys.stderr)
         return []
-    names = set(result.stdout.split())
+    names = _asset_names(root, gh, tag)
+    if names is None:
+        return []
+    wheel = f"python_mcp_bootstrap-{version}-py3-none-any.whl"
+    sdist = f"python_mcp_bootstrap-{version}.tar.gz"
     required = {
-        f"python_mcp_bootstrap-{version}-py3-none-any.whl",
-        f"python_mcp_bootstrap-{version}.tar.gz",
+        wheel,
+        sdist,
         "SHA256SUMS",
+        f"{wheel}.sigstore.json",
+        f"{sdist}.sigstore.json",
+        "SHA256SUMS.sigstore.json",
+        "provenance.intoto.jsonl",
     }
-    return [f"release {tag!r} is missing asset {name}" for name in sorted(required - names)]
+    errors = [f"release {tag!r} is missing asset {name}" for name in sorted(required - names)]
+    if errors:
+        return errors
+    with tempfile.TemporaryDirectory() as temp:
+        download_error = _download_assets(root, gh, tag, Path(temp))
+        if download_error:
+            return [download_error]
+        errors.extend(_checksum_errors(Path(temp), version))
+    return errors
 
 
 def check(root: Path = ROOT, *, allow_dirty: bool = False, tag: str | None = None) -> list[str]:
