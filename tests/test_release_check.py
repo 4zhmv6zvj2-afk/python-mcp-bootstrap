@@ -235,6 +235,31 @@ def test_missing_release_skips(
     assert "skipping" in capsys.readouterr().err
 
 
+def _required_asset_names(version: str = "0.1.0") -> list[str]:
+    wheel = f"python_mcp_bootstrap-{version}-py3-none-any.whl"
+    sdist = f"python_mcp_bootstrap-{version}.tar.gz"
+    return [
+        wheel,
+        sdist,
+        "SHA256SUMS",
+        f"{wheel}.sigstore.json",
+        f"{sdist}.sigstore.json",
+        "SHA256SUMS.sigstore.json",
+        "provenance.intoto.jsonl",
+    ]
+
+
+@pytest.mark.parametrize("missing", _required_asset_names())
+def test_every_required_asset_is_enforced(
+    missing: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    releases, contents = _release_fixture(drop=missing)
+    _install_fake_gh(monkeypatch, tmp_path, releases=releases, contents=contents)
+
+    errors = _release_asset_errors(ROOT, "v0.1.0", "0.1.0")
+    assert any("missing asset" in error and missing in error for error in errors)
+
+
 def test_missing_asset_is_reported(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     wheel = "python_mcp_bootstrap-0.1.0-py3-none-any.whl"
     releases, contents = _release_fixture(drop=wheel)
