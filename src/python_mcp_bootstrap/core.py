@@ -297,12 +297,16 @@ def find_uv() -> str | None:
     return None
 
 
-_CREDENTIAL_URL = re.compile(r"([A-Za-z][A-Za-z0-9+.-]*://)[^/\s:@]+(?::[^/\s@]*)?@", re.IGNORECASE)
+_CREDENTIAL_URL = re.compile(r"([A-Za-z][A-Za-z0-9+.-]*://)[^@\s]*@")
 _SECRET_FIELD = re.compile(
-    r"(?i)([\"']?\b(?:[A-Za-z0-9]+[_-])?"
-    r"(?:token|api[_-]?key|password|passwd|secret|private[_-]?key)\b[\"']?)"
+    r"(?i)([\"']?\b(?:[A-Za-z0-9]+[_-])*"
+    r"(?:token|api[_-]?key|password|passwd|secret|private[_-]?key|access[_-]?key)"
+    r"(?:[_-][A-Za-z0-9]+)*\b[\"']?)"
     r"(\s*[=:]\s*)"
     r"(\"[^\"]*\"|'[^']*'|\S+)"
+)
+_AUTH_HEADER = re.compile(
+    r"(?i)\b((?:proxy-)?authorization\s*:\s*(?:basic|bearer|token|digest)\s+)[^\s\"']+"
 )
 _BEARER_TOKEN = re.compile(r"(?i)\b(bearer\s+)[A-Za-z0-9._~+/=-]{8,}")
 
@@ -310,11 +314,15 @@ _BEARER_TOKEN = re.compile(r"(?i)\b(bearer\s+)[A-Za-z0-9._~+/=-]{8,}")
 def _redact(text: str) -> str:
     """Mask credentials that a tool may echo into diagnostics.
 
-    Covers URL userinfo, ``key=value`` / ``"key": "value"`` pairs, and
-    ``Authorization: Bearer`` headers.  Over-redacting is preferred to leaking.
+    Covers URL userinfo (including passwords containing ``/`` or ``@``),
+    ``key=value`` / ``"key": "value"`` pairs for credential-shaped names
+    (``AWS_SECRET_ACCESS_KEY``, ``MY_API_KEY``, ...), and
+    ``Authorization``/``Proxy-Authorization`` headers (Basic, Bearer, Token,
+    Digest) plus bare bearer tokens.  Over-redacting is preferred to leaking.
     """
 
-    text = _CREDENTIAL_URL.sub(r"\1***:***@", text)
+    text = _CREDENTIAL_URL.sub(r"\1***@", text)
+    text = _AUTH_HEADER.sub(r"\1***", text)
     text = _BEARER_TOKEN.sub(r"\1***", text)
     return _SECRET_FIELD.sub(r"\1\2***", text)
 

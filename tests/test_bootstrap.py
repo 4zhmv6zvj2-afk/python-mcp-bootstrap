@@ -611,7 +611,7 @@ def test_run_command_redacts_credentials(tmp_path: Path) -> None:
     assert "token=abc" not in result["stderr"]
     assert "secret-value" not in result["stderr"]
     assert "abcdefghijklmnop" not in result["stderr"]
-    assert "https://***:***@example.com token=***" in result["stderr"]
+    assert "https://***@example.com token=***" in result["stderr"]
     assert '"api_key": ***' in result["stderr"]
     assert "Bearer ***" in result["stderr"]
 
