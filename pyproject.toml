@@ -11,6 +11,8 @@ requires-python = ">=3.14"
 license = "MIT"
 license-files = ["LICENSE"]
 keywords = ["mcp", "python", "bootstrap", "runtime", "uv"]
+authors = [{ name = "Ron", email = "4zhmv6zvj2-afk@users.noreply.github.com" }]
+maintainers = [{ name = "Ron", email = "4zhmv6zvj2-afk@users.noreply.github.com" }]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
@@ -36,8 +38,9 @@ python-mcp-bootstrap = "python_mcp_bootstrap.cli:main"
 
 [project.urls]
 Repository = "https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap"
+Documentation = "https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/blob/main/README.md"
 Changelog = "https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/blob/main/CHANGELOG.md"
-Documentation = "https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/blob/main/docs/contract.md"
+Issues = "https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/python_mcp_bootstrap"]

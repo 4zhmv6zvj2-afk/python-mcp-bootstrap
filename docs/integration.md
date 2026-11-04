@@ -82,6 +82,15 @@ to `uv pip install` directly and never uses a shell.
 For a source distribution, the adapter imports the vendored file rather than a
 Git dependency. The vendor step keeps the pre-install path auth-free.
 
+## Python floor vs. vendoring
+
+`pip install python-mcp-bootstrap` requires Python 3.14+ (the package metadata
+says `requires-python >=3.14`). A consumer whose first-run wrapper must execute
+on Python 3.12 or 3.13 cannot pip-install it: that consumer vendors `core.py`
+into the wrapper instead. Vendored code is held to 3.12 syntax and standard
+library only, which is why the package imports nothing outside the stdlib and
+never imports the MCP SDK.
+
 ## Why not a pip dependency
 
 A first-run entry point may execute on Python 3.12, before the application's
