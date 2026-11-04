@@ -284,12 +284,14 @@ def test_consent_provisions_project_local_python(tmp_path: Path) -> None:
     joined = runs.commands
     assert any("python install 3.15.2" in line for line in joined)
     assert any("venv .venv --python 3.15.2 --seed" in line for line in joined)
-    assert any("pip install -e ." in line for line in joined)
+    assert any("pip install --python" in line and "-e ." in line for line in joined)
     assert any("example_mcp" in line for line in joined)
     assert (tmp_path / ".python-version").read_text(encoding="utf-8") == "3.15.2\n"
     assert execs.calls[0][0] == str(venv_python(tmp_path, spec.venv_dir))
 
     install_call = next(call for call in runs.calls if "pip install" in " ".join(call[0]))
+    command = install_call[0]
+    assert command.index("--python") < command.index("-e")
     assert install_call[2]["UV_PYTHON_INSTALL_DIR"] == str(tmp_path / ".uv-python")
     assert install_call[2]["UV_PYTHON_DOWNLOADS"] == "automatic"
     assert install_call[2]["UV_PYTHON_PREFERENCE"] == "only-managed"
@@ -1045,7 +1047,7 @@ def test_existing_good_venv_with_missing_module_repairs_with_consent(tmp_path: P
 
     assert code == 0
     commands = runner.commands
-    assert any("pip install -e ." in command for command in commands)
+    assert any("pip install --python" in command and "-e ." in command for command in commands)
     assert any("example_mcp" in command for command in commands)
     assert not any("python install" in command for command in commands)
     assert not any("venv .venv" in command for command in commands)

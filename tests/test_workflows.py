@@ -4,7 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 WORKFLOWS = Path(__file__).resolve().parents[1] / ".github" / "workflows"
+
+pytestmark = pytest.mark.skipif(
+    not WORKFLOWS.is_dir(),
+    reason="workflow files are not shipped in the sdist",
+)
 
 
 def _workflow(name: str) -> str:
@@ -43,7 +50,7 @@ def test_publish_requires_a_published_immutable_release() -> None:
 
 
 def test_prepare_release_detects_existing_drafts() -> None:
-    """gh release view cannot see drafts; the list endpoint must be used."""
+    """gh release view returned 404 for drafts in practice; list releases instead."""
 
     text = _workflow("prepare-release.yml")
 

@@ -80,7 +80,7 @@ After explicit consent, `provision()` runs in this order:
    `uv venv .venv --python <pin> --seed`, with `UV_PYTHON_INSTALL_DIR` set to
    the project-local `.uv-python`, `UV_PYTHON_PREFERENCE=only-managed`, and
    `UV_PYTHON_DOWNLOADS=automatic`.
-4. `uv pip install <install_args> --python <venv python>`.
+4. `uv pip install --python <venv python> <install_args>`.
 5. Verify with `verify_import` when configured, then probe the interpreter
    version against the floor. Either failure returns `provision_failed`
    (exit `5`).
