@@ -12,14 +12,16 @@ from __future__ import annotations
 import argparse
 import ast
 import hashlib
+import json
+import os
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
-import time
 import tomllib
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 PIN = "3.15.2"
@@ -81,11 +83,53 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _asset_names(root: Path, gh: str, tag: str) -> set[str] | None:
-    """Return the published asset names, or None when the release is not readable."""
+def _slug_from_remote(url: str) -> str | None:
+    """Extract ``owner/repo`` from a GitHub remote URL."""
+
+    match = re.search(r"github\.com[:/]+([^/\s]+)/([^/\s]+?)(?:\.git)?/?$", url.strip())
+    if match is None:
+        return None
+    return f"{match.group(1)}/{match.group(2)}"
+
+
+def _repo_slug(root: Path) -> str | None:
+    """Return ``owner/repo`` from GITHUB_REPOSITORY or the origin remote."""
+
+    from_env = os.environ.get("GITHUB_REPOSITORY", "").strip()
+    if re.fullmatch(r"[^/\s]+/[^/\s]+", from_env):
+        return from_env
+    remote = _git(root, "remote", "get-url", "origin")
+    if remote.returncode != 0:
+        return None
+    return _slug_from_remote(remote.stdout)
+
+
+def _parse_release_pages(raw: str) -> list[dict[str, Any]]:
+    """Parse ``gh api --paginate`` output (concatenated JSON arrays)."""
+
+    releases: list[dict[str, Any]] = []
+    decoder = json.JSONDecoder()
+    index = 0
+    while index < len(raw):
+        while index < len(raw) and raw[index] in " \t\r\n":
+            index += 1
+        if index >= len(raw):
+            break
+        page, index = decoder.raw_decode(raw, index)
+        if isinstance(page, list):
+            releases.extend(item for item in page if isinstance(item, dict))
+    return releases
+
+
+def _release_assets(root: Path, gh: str, tag: str, slug: str) -> dict[str, int] | None:
+    """Return asset name -> asset id for ``tag``, or None when unreadable.
+
+    Drafts are included by the releases list endpoint, which is why this does
+    not use ``gh release view``: that command returns 404 for a draft.
+    """
 
     result = subprocess.run(
-        [gh, "release", "view", tag, "--json", "assets", "--jq", ".assets[].name"],
+        [gh, "api", f"repos/{slug}/releases?per_page=100", "--paginate"],
         cwd=str(root),
         capture_output=True,
         text=True,
@@ -93,41 +137,55 @@ def _asset_names(root: Path, gh: str, tag: str) -> set[str] | None:
     )
     if result.returncode != 0:
         print(
-            f"release check: release {tag!r} is not readable; skipping asset check", file=sys.stderr
+            f"release check: release {tag!r} is not readable; skipping asset check",
+            file=sys.stderr,
         )
         return None
-    return set(result.stdout.split())
+    for release in _parse_release_pages(result.stdout):
+        if release.get("tag_name") != tag:
+            continue
+        assets = release.get("assets")
+        if not isinstance(assets, list):
+            return {}
+        return {
+            str(asset["name"]): int(asset["id"])
+            for asset in assets
+            if isinstance(asset, dict) and "name" in asset and "id" in asset
+        }
+    print(
+        f"release check: release {tag!r} is not readable; skipping asset check",
+        file=sys.stderr,
+    )
+    return None
 
 
-def _download_assets(root: Path, gh: str, tag: str, dest: Path) -> str | None:
-    """Download the checksummed artifacts; retry briefly for asset propagation."""
+def _download_assets(
+    root: Path,
+    gh: str,
+    slug: str,
+    assets: dict[str, int],
+    dest: Path,
+    names: list[str],
+) -> str | None:
+    """Download the named assets by id into ``dest``."""
 
-    for attempt in range(4):
+    for name in names:
         result = subprocess.run(
             [
                 gh,
-                "release",
-                "download",
-                tag,
-                "--pattern",
-                "SHA256SUMS",
-                "--pattern",
-                "*.whl",
-                "--pattern",
-                "*.tar.gz",
-                "--dir",
-                str(dest),
+                "api",
+                f"repos/{slug}/releases/assets/{assets[name]}",
+                "-H",
+                "Accept: application/octet-stream",
             ],
             cwd=str(root),
             capture_output=True,
-            text=True,
             check=False,
         )
-        if result.returncode == 0:
-            return None
-        if attempt < 3:
-            time.sleep(3)
-    return f"release {tag!r} assets could not be downloaded"
+        if result.returncode != 0:
+            return f"release asset {name!r} could not be downloaded"
+        (dest / name).write_bytes(result.stdout)
+    return None
 
 
 def _checksum_errors(dest: Path, version: str) -> list[str]:
@@ -165,16 +223,23 @@ def _release_asset_errors(root: Path, tag: str, version: str) -> list[str]:
     """Check the GitHub release assets when gh is available.
 
     A tag build may run before the release is created; that is reported as a
-    skip, not a failure.  A readable release with missing assets, mismatched
-    digests, or without signatures/provenance fails.
+    skip, not a failure.  A readable release, including a draft, with missing
+    assets, mismatched digests, or without signatures/provenance fails.
     """
 
     gh = shutil.which("gh")
     if gh is None:
         print("release check: gh not found; skipping GitHub release asset check", file=sys.stderr)
         return []
-    names = _asset_names(root, gh, tag)
-    if names is None:
+    slug = _repo_slug(root)
+    if slug is None:
+        print(
+            "release check: cannot determine the repository; skipping asset check",
+            file=sys.stderr,
+        )
+        return []
+    assets = _release_assets(root, gh, tag, slug)
+    if assets is None:
         return []
     wheel = f"python_mcp_bootstrap-{version}-py3-none-any.whl"
     sdist = f"python_mcp_bootstrap-{version}.tar.gz"
@@ -187,15 +252,32 @@ def _release_asset_errors(root: Path, tag: str, version: str) -> list[str]:
         "SHA256SUMS.sigstore.json",
         "provenance.intoto.jsonl",
     }
-    errors = [f"release {tag!r} is missing asset {name}" for name in sorted(required - names)]
+    errors = [
+        f"release {tag!r} is missing asset {name}" for name in sorted(required - assets.keys())
+    ]
     if errors:
         return errors
     with tempfile.TemporaryDirectory() as temp:
-        download_error = _download_assets(root, gh, tag, Path(temp))
+        download_error = _download_assets(
+            root, gh, slug, assets, Path(temp), [wheel, sdist, "SHA256SUMS"]
+        )
         if download_error:
             return [download_error]
         errors.extend(_checksum_errors(Path(temp), version))
     return errors
+
+
+def _duplicate_heading_errors(text: str) -> list[str]:
+    """Report changelog versions that have more than one dated heading."""
+
+    headings = re.findall(r"^## (\d+\.\d+\.\d+) — \d{4}-\d{2}-\d{2}$", text, re.MULTILINE)
+    seen: set[str] = set()
+    duplicates: set[str] = set()
+    for version in headings:
+        if version in seen:
+            duplicates.add(version)
+        seen.add(version)
+    return [f"CHANGELOG has duplicate entries for {version}" for version in sorted(duplicates)]
 
 
 def check(root: Path = ROOT, *, allow_dirty: bool = False, tag: str | None = None) -> list[str]:
@@ -248,6 +330,7 @@ def check(root: Path = ROOT, *, allow_dirty: bool = False, tag: str | None = Non
         text = changelog.read_text(encoding="utf-8")
         heading = re.compile(rf"^## {re.escape(version)} — \d{{4}}-\d{{2}}-\d{{2}}$", re.MULTILINE)
         require(bool(heading.search(text)), "CHANGELOG has no dated release entry")
+        failures.extend(_duplicate_heading_errors(text))
 
     notes = root / "docs" / "releases" / f"{version}.md"
     require(notes.is_file(), f"missing release notes: {notes}")
