@@ -53,6 +53,32 @@ def test_publish_workflow_cannot_modify_release_assets() -> None:
     )
 
 
+def test_publish_verifies_sigstore_bundles_before_pypi() -> None:
+    document = _load("publish.yml")
+    steps = _steps(document, "publish")
+    names = [str(step.get("name", "")) for step in steps]
+
+    download = next(
+        step for step in steps if step.get("name") == "Download published distributions"
+    )
+    assert "*.sigstore.json" in str(download["run"])
+    assert any("sigstore/cosign-installer" in str(step.get("uses", "")) for step in steps)
+
+    verify = next(step for step in steps if step.get("name") == "Verify Sigstore bundles")
+    run = str(verify["run"])
+    assert "cosign verify-blob" in run
+    assert "prepare-release.yml" in run
+    assert "certificate-oidc-issuer" in run
+    assert "token.actions.githubusercontent.com" in run
+
+    assert names.index("Verify Sigstore bundles") < names.index("Stage PyPI distributions only")
+    assert names.index("Verify Sigstore bundles") < names.index(
+        "Publish with OIDC trusted publishing"
+    )
+    staged = next(step for step in steps if step.get("name") == "Stage PyPI distributions only")
+    assert ".sigstore.json" not in str(staged["run"])
+
+
 def test_prepare_release_attaches_assets_only_to_a_draft() -> None:
     document = _load("prepare-release.yml")
     job = document["jobs"]["prepare"]
