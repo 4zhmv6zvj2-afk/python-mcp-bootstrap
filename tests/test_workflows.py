@@ -69,7 +69,8 @@ def test_publish_verifies_sigstore_bundles_before_pypi() -> None:
     assert "cosign verify-blob" in run
     assert "prepare-release.yml" in run
     assert "certificate-oidc-issuer" in run
-    assert "token.actions.githubusercontent.com" in run
+    issuer_line = "issuer='https://token.actions.githubusercontent.com'"
+    assert any(line.strip() == issuer_line for line in run.splitlines())
 
     assert names.index("Verify Sigstore bundles") < names.index("Stage PyPI distributions only")
     assert names.index("Verify Sigstore bundles") < names.index(
