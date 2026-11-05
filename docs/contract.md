@@ -14,9 +14,10 @@ arguments plus a `BootstrapSpec`:
 | `entrypoint` | First-run script relaunched under the chosen interpreter | `first_run.py` |
 | `env_var` | Environment variable set to the chosen interpreter for the exec handoff and the in-process continuation. A wrapper may branch on it and skip `bootstrap()` after the handoff | `MCP_BOOTSTRAP_INTERPRETER` |
 | `package_main` | In-process continuation when already on a good interpreter. Required when the entry point calls `bootstrap()` unconditionally: a missing continuation is an error (`missing_continuation`), never a silent re-exec | `None` |
-| `required` | Minimum final interpreter version | `(3, 14, 0)` |
+| `required` | Minimum final interpreter version | `(3, 12, 0)` |
 | `pin` | Plain final interpreter version (`X[.Y[.Z]]`) installed after consent; must be at or above `required` | `3.15.2` |
 | `install_args` | Arguments to `uv pip install`; path-like entries must not be absolute, Windows-rooted, or contain `..`, including attached short values (`-t/tmp/x`); `--target`, `--prefix`, `--root`, and `--python` (and short forms) are reserved | `("-e", ".")` |
+| `requirements` | Optional project-relative, hash-pinned requirement files. Each is installed with `uv pip install --require-hashes -r <file>` before the project install, which then runs with `--no-deps` | `()` |
 | `verify_import` | Module imported, in isolated mode, to verify the install; must be dotted identifiers and must not contain Python keywords | `None` |
 | `card` | Consent text returned when a download would be needed; must be non-empty, and the default names `spec.pin` | built-in card |
 | `repair_card` | Consent text returned when an existing venv needs the app/MCP reinstalled | built-in repair card |
@@ -81,20 +82,27 @@ After explicit consent, `provision()` runs in this order:
    `uv venv .venv --python <pin> --seed`, with `UV_PYTHON_INSTALL_DIR` set to
    the project-local `.uv-python`, `UV_PYTHON_PREFERENCE=only-managed`, and
    `UV_PYTHON_DOWNLOADS=automatic`.
-4. `uv pip install --python <venv python> <install_args>`.
-5. Verify with `verify_import` when configured, then probe the interpreter
+4. When `requirements` is non-empty, run
+   `uv pip install --require-hashes -r <each file> --python <venv python>`;
+   a failure returns `runtime_requirements_failed` (exit `5`) before the
+   project install.
+5. Install the project with
+   `uv pip install --python <venv python> [--no-deps] <install_args>`;
+   `--no-deps` is present only when `requirements` is non-empty.
+6. Verify with `verify_import` when configured, then probe the interpreter
    version against the floor. Either failure returns `provision_failed`
    (exit `5`).
-6. Write `.python-version` with `spec.pin`, but only when step 3 ran in this
+7. Write `.python-version` with `spec.pin`, but only when step 3 ran in this
    call, that is, when this run installed the pinned interpreter.
-7. Return the chosen interpreter to the caller, which execs the entrypoint (or
+8. Return the chosen interpreter to the caller, which execs the entrypoint (or
    continues in-process); an `OSError` during the handoff returns
    `exec_failed` (exit `8`) as a JSON report.
 
 If a supported `.venv` already exists and only the app/MCP is missing, steps
-3–4 become a repair install into that venv: no Python download. Because this
-run did not install the pin, step 6 is skipped and the existing pin file is
-left exactly as it was (including when it is absent).
+3–5 become a repair install into that venv: no Python download, but the
+`requirements` install still runs when configured. Because this run did not
+install the pin, step 7 is skipped and the existing pin file is left exactly
+as it was (including when it is absent).
 
 ## Results and exit codes
 
@@ -104,7 +112,7 @@ left exactly as it was (including when it is absent).
 | `2` | `python_flag_missing` | `--python` had no value |
 | `3` | `python_too_old` | No usable interpreter and no consent |
 | `4` | `needs_uv` | Consent was given, but uv is not installed; `tip` carries the official install instructions |
-| `5` | `provision_failed`, `venv_locked`, `pin_write_failed`, `verify_import_failed` | Provisioning, verification, or pin write failed; `verify_import_failed` is reported when an explicitly chosen interpreter cannot import `verify_import` |
+| `5` | `provision_failed`, `venv_locked`, `pin_write_failed`, `verify_import_failed`, `runtime_requirements_failed` | Provisioning, verification, pin write, or the hash-pinned requirements install failed; `verify_import_failed` is reported when an explicitly chosen interpreter cannot import `verify_import`; `runtime_requirements_failed` stops before the project install |
 | `6` | `needs_install` | Existing venv is missing the app/MCP; consent is needed to repair it |
 | `7` | `missing_continuation` | Re-entry with no continuation: `env_var` already names a usable interpreter and no `package_main`/`main_fn` is configured. Nothing is exec'd or downloaded |
 | `8` | `exec_failed` | The chosen interpreter could not be started (for example it vanished between probe and exec). A JSON report with a redacted `detail` is written; no traceback escapes |
@@ -130,11 +138,11 @@ stderr. Reports include `app` plus the keys used by consumers: `ok`,
   no continuation is a `missing_continuation` report (exit `7`), never a loop.
 - `root` is the trust boundary: it is the working directory for every step,
   and the consumer supplies it as its own project directory.
-- Bootstrap paths and path-like `install_args` are project-local: absolute,
-  Windows-rooted, and `..` values are rejected, whether they are separate
-  arguments, embedded in a long flag, or attached to a short flag
-  (`-t/tmp/x`). Venv-redirecting flags (`--target`, `--prefix`, `--root`,
-  `--python` and short forms) are rejected.
+- Bootstrap paths, `requirements` files, and path-like `install_args` are
+  project-local: absolute, Windows-rooted, and `..` values are rejected,
+  whether they are separate arguments, embedded in a long flag, or attached to
+  a short flag (`-t/tmp/x`). Venv-redirecting flags (`--target`, `--prefix`,
+  `--root`, `--python` and short forms) are rejected.
 - Path checks are lexical: they do not resolve symlinks. A symlink inside the
   project can still point outside; the consumer owns that boundary.
 - Concurrent first runs against one project are not supported. There is no

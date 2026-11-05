@@ -67,7 +67,7 @@ def test_distribution_metadata_matches_the_package() -> None:
     metadata = DISTRIBUTION.metadata
     assert metadata["Name"] == "python-mcp-bootstrap"
     assert DISTRIBUTION.version == python_mcp_bootstrap.__version__
-    assert metadata["Requires-Python"] == ">=3.14"
+    assert metadata["Requires-Python"] == ">=3.12"
     assert metadata["License-Expression"] == "MIT"
     labels = {entry.split(", ", 1)[0] for entry in metadata.get_all("Project-URL") or []}
     assert {"Repository", "Documentation", "Changelog", "Issues"} <= labels

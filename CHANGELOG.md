@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.2.0 — 2026-11-05
+
+One Python floor for the bootstrap and its consumers, and the hash-pinned
+runtime install becomes an upstream feature.
+
+### Added
+
+- `BootstrapSpec.requirements`: optional project-relative, hash-pinned
+  requirement files. Provisioning installs them with
+  `uv pip install --require-hashes -r <file>` before the project install, then
+  installs the project with `--no-deps`. A failure returns
+  `runtime_requirements_failed` (exit `5`) and stops before the project
+  install. This replaces the per-consumer patch that vendored copies carried.
+- `docs/version-policy.md`: the floor/CI-line/provisioning-pin policy shared by
+  the Python repos.
+
+### Changed
+
+- Python floor is 3.12 everywhere in the package: metadata
+  `requires-python = ">=3.12"`, `core.REQUIRED = (3, 12, 0)`, and the advertised
+  supported interpreters are 3.12–3.15. Consumers may still raise
+  `required` for their own application.
+- CI runs the minor lines `3.12`, `3.13`, `3.14`, `3.15` with
+  `check-latest: true` and records the resolved patch with `python -VV`.
+  Release/build jobs keep the exact 3.15.2 pin; `PIN` stays 3.15.2.
+- The committed `.python-version` names the `3.15` line; runtime provisioning
+  still writes the exact `PIN`. `release_check` enforces the line rule.
+- `requirements-ci.txt` is compiled for the 3.12 floor; `hatchling` is part of
+  the dev extra so the documented build path works from a clean dev install.
+- macOS CI uses the `3.15` line and measures `scripts/` coverage like the main
+  job.
+
+### Docs
+
+- README, CONTRIBUTING, `docs/contract.md`, and `docs/integration.md` describe
+  the single 3.12 floor, vendoring as the recommended pre-install pattern (not
+  a floor workaround), and the two-phase requirements install.
+
 ## 0.1.6 — 2026-11-05
 
 First release exercising the hardened release gates end to end.

@@ -17,7 +17,7 @@ def test_check_reports_the_pin(capsys: pytest.CaptureFixture[str]) -> None:
     payload = json.loads(capsys.readouterr().out)
     assert payload["ok"] is True
     assert payload["version"] == __version__
-    assert payload["required"] == ">=3.14.0"
+    assert payload["required"] == ">=3.12.0"
     assert payload["pin"] == "3.15.2"
     assert "uv" in payload
 

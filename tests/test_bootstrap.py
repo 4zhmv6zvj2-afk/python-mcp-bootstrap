@@ -178,7 +178,7 @@ def test_old_uv_failure_includes_an_upgrade_tip(
         tmp_path,
         _spec(),
         run=UvVersionRunner("0.11.27"),
-        current=(3, 12, 13),
+        current=(3, 11, 13),
         probe=lambda _exe: None,
         uv="/fake/uv",
     )
@@ -198,7 +198,7 @@ def test_recent_uv_failure_has_no_upgrade_tip(
         tmp_path,
         _spec(),
         run=UvVersionRunner("0.13.7"),
-        current=(3, 12, 13),
+        current=(3, 11, 13),
         probe=lambda _exe: None,
         uv="/fake/uv",
     )
@@ -221,7 +221,7 @@ def test_below_floor_without_consent_stops_before_any_subprocess(
         spec,
         exec_fn=execs,
         run=runs,
-        current=(3, 12, 13),
+        current=(3, 11, 13),
         probe=lambda _exe: None,
     )
 
@@ -229,8 +229,8 @@ def test_below_floor_without_consent_stops_before_any_subprocess(
     assert code == 3
     assert report["reason"] == "python_too_old"
     assert report["app"] == "example-mcp"
-    assert report["found"] == "3.12.13"
-    assert report["required"] == ">=3.14"
+    assert report["found"] == "3.11.13"
+    assert report["required"] == ">=3.12"
     assert report["needs_consent"] is True
     assert report["card"] == CARD
     assert report["next"] == "python first_run.py --install-python"
@@ -250,7 +250,7 @@ def test_existing_good_venv_is_used_without_a_card(tmp_path: Path) -> None:
         spec,
         exec_fn=execs,
         run=runs,
-        current=(3, 12, 13),
+        current=(3, 11, 13),
         probe=lambda _exe: (3, 15, 2),
     )
 
@@ -276,7 +276,7 @@ def test_consent_provisions_project_local_python(tmp_path: Path) -> None:
         exec_fn=execs,
         run=runs,
         uv="/fake/uv",
-        current=(3, 12, 13),
+        current=(3, 11, 13),
         probe=lambda _exe: (3, 15, 2),
     )
 
@@ -340,7 +340,7 @@ def test_python_override_is_checked_before_use(
         spec,
         exec_fn=execs,
         run=RunRecorder(),
-        current=(3, 12, 13),
+        current=(3, 11, 13),
         probe=lambda _exe: (3, 9, 6),
     )
     report = json.loads(capsys.readouterr().out)
@@ -354,7 +354,7 @@ def test_python_override_is_checked_before_use(
         spec,
         exec_fn=execs,
         run=RunRecorder(),
-        current=(3, 12, 13),
+        current=(3, 11, 13),
         probe=lambda _exe: (3, 16, 0),
     )
     assert code == 0
@@ -364,7 +364,7 @@ def test_python_override_is_checked_before_use(
 def test_python_flag_without_a_value_is_a_usage_error(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    code = bootstrap(["--python"], tmp_path, _spec(), current=(3, 12, 13))
+    code = bootstrap(["--python"], tmp_path, _spec(), current=(3, 11, 13))
     report = json.loads(capsys.readouterr().out)
     assert code == 2
     assert report["reason"] == "python_flag_missing"
@@ -451,7 +451,7 @@ def test_provision_failure_is_reported_without_handoff(
         exec_fn=execs,
         run=runs,
         uv="/fake/uv",
-        current=(3, 12, 13),
+        current=(3, 11, 13),
         probe=lambda _exe: None,
     )
 
@@ -478,7 +478,7 @@ def test_verify_failure_is_reported_without_handoff(
         exec_fn=execs,
         run=runs,
         uv="/fake/uv",
-        current=(3, 12, 13),
+        current=(3, 11, 13),
         probe=lambda _exe: (3, 15, 2),
     )
 
@@ -518,7 +518,7 @@ def test_paths_with_spaces_are_passed_as_arguments(tmp_path: Path) -> None:
         spec,
         exec_fn=execs,
         run=RunRecorder(),
-        current=(3, 12, 13),
+        current=(3, 11, 13),
         probe=lambda _exe: (3, 15, 2),
     )
 
@@ -699,7 +699,7 @@ def test_double_dash_stops_bootstrap_flag_parsing(tmp_path: Path) -> None:
 def test_incomplete_python_override_is_a_usage_error(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], args: list[str]
 ) -> None:
-    code = bootstrap(args, tmp_path, _spec(), current=(3, 12, 13))
+    code = bootstrap(args, tmp_path, _spec(), current=(3, 11, 13))
     report = json.loads(capsys.readouterr().out)
     assert code == 2
     assert report["reason"] == "python_flag_missing"
@@ -713,7 +713,7 @@ def test_no_consent_never_looks_for_uv(
         raise AssertionError("find_uv must not run without consent")
 
     monkeypatch.setattr(core, "find_uv", unexpected)
-    code = bootstrap([], tmp_path, _spec(), current=(3, 12, 13), probe=lambda _exe: None)
+    code = bootstrap([], tmp_path, _spec(), current=(3, 11, 13), probe=lambda _exe: None)
     assert code == 3
     assert json.loads(capsys.readouterr().out)["reason"] == "python_too_old"
 
@@ -787,7 +787,7 @@ def test_entrypoint_with_spaces_is_passed_as_one_argument(tmp_path: Path) -> Non
         spec,
         exec_fn=execs,
         run=RunRecorder(),
-        current=(3, 12, 13),
+        current=(3, 11, 13),
         probe=lambda _exe: (3, 15, 2),
     )
 
@@ -953,7 +953,7 @@ def test_post_install_probe_failure_is_reported(tmp_path: Path) -> None:
         _spec(),
         uv="/fake/uv",
         run=RunRecorder(),
-        probe=lambda _exe: (3, 13, 0),
+        probe=lambda _exe: (3, 11, 0),
     )
 
     assert result["ok"] is False
@@ -1017,7 +1017,7 @@ def test_existing_good_venv_with_missing_module_needs_repair_consent(
         spec,
         exec_fn=execs,
         run=RunRecorder(failures={"example_mcp"}),
-        current=(3, 12, 13),
+        current=(3, 11, 13),
         probe=lambda _exe: (3, 15, 2),
     )
 
@@ -1044,7 +1044,7 @@ def test_existing_good_venv_with_missing_module_repairs_with_consent(tmp_path: P
         exec_fn=execs,
         run=runner,
         uv="/fake/uv",
-        current=(3, 12, 13),
+        current=(3, 11, 13),
         probe=lambda _exe: (3, 15, 2),
     )
 
@@ -1098,7 +1098,7 @@ def test_flat_layout_verify_import_fails_without_install(
         tmp_path,
         spec,
         exec_fn=execs,
-        current=(3, 12, 13),
+        current=(3, 11, 13),
         probe=lambda _exe: (3, 15, 2),
     )
 
@@ -1169,3 +1169,107 @@ def test_utf16_pin_file_returns_pin_write_failed(tmp_path: Path) -> None:
     assert result["ok"] is False
     assert result["reason"] == "pin_write_failed"
     assert result["detail"]
+
+
+def test_floor_is_312_and_accepts_a_312_interpreter(tmp_path: Path) -> None:
+    seen: list[list[str]] = []
+
+    def main(args: list[str]) -> int:
+        seen.append(args)
+        return 0
+
+    spec = _spec(package_main=main, verify_import=None)
+    code = bootstrap([], tmp_path, spec, current=(3, 12, 13))
+
+    assert code == 0
+    assert seen == [[]]
+
+
+def test_requirements_are_installed_before_the_project_with_no_deps(tmp_path: Path) -> None:
+    spec = _spec(requirements=("requirements-runtime.txt",))
+    runner = RunRecorder()
+
+    code = bootstrap(
+        ["--install-python"],
+        tmp_path,
+        spec,
+        exec_fn=ExecRecorder(),
+        run=runner,
+        uv="/fake/uv",
+        current=(3, 11, 13),
+        probe=lambda _exe: (3, 15, 2),
+    )
+
+    assert code == 0
+    commands = runner.commands
+    requirements_command = next(command for command in commands if "--require-hashes" in command)
+    project_command = next(command for command in commands if "--no-deps" in command)
+    assert "-r requirements-runtime.txt" in requirements_command
+    assert "--python" in requirements_command
+    assert commands.index(requirements_command) < commands.index(project_command)
+    assert "-e ." in project_command
+
+
+def test_runtime_requirements_failure_stops_before_the_project_install(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    spec = _spec(requirements=("requirements-runtime.txt",))
+    runner = RunRecorder(failures={"--require-hashes"})
+
+    code = bootstrap(
+        ["--install-python"],
+        tmp_path,
+        spec,
+        exec_fn=ExecRecorder(),
+        run=runner,
+        uv="/fake/uv",
+        current=(3, 11, 13),
+        probe=lambda _exe: (3, 15, 2),
+    )
+
+    report = json.loads(capsys.readouterr().out)
+    assert code == 5
+    assert report["reason"] == "runtime_requirements_failed"
+    assert any("--require-hashes" in command for command in runner.commands)
+    assert not any("--no-deps" in command for command in runner.commands)
+
+
+def test_empty_requirements_keep_the_single_phase_install(tmp_path: Path) -> None:
+    runner = RunRecorder()
+
+    code = bootstrap(
+        ["--install-python"],
+        tmp_path,
+        _spec(),
+        exec_fn=ExecRecorder(),
+        run=runner,
+        uv="/fake/uv",
+        current=(3, 11, 13),
+        probe=lambda _exe: (3, 15, 2),
+    )
+
+    assert code == 0
+    assert not any("--require-hashes" in command for command in runner.commands)
+    assert not any("--no-deps" in command for command in runner.commands)
+
+
+def test_requirements_run_on_the_repair_path(tmp_path: Path) -> None:
+    spec = _spec(requirements=("requirements-runtime.txt",))
+    _fake_venv(tmp_path, spec)
+    runner = ScriptedRunner([1, 0, 0, 0])
+
+    result = provision(
+        tmp_path,
+        spec,
+        uv="/fake/uv",
+        run=runner,
+        probe=lambda _exe: (3, 15, 2),
+    )
+
+    assert result["ok"] is True
+    commands = runner.commands
+    requirements_command = next(command for command in commands if "--require-hashes" in command)
+    project_command = next(command for command in commands if "--no-deps" in command)
+    assert commands.index(requirements_command) < commands.index(project_command)
+    assert not any("python install" in command for command in commands)
+    assert not (tmp_path / ".python-version").exists()

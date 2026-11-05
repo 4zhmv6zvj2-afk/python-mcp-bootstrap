@@ -20,7 +20,7 @@ jobs:
         # capacity-constrained and intermittently cancels queued jobs, which
         # must not gate PRs.
         os: [ubuntu-latest, windows-latest]
-        python-version: ["3.14.10", "3.15.2"]
+        python-version: ["3.12", "3.13", "3.14", "3.15"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - name: Restore annotated release tag
@@ -32,6 +32,9 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
           python-version: ${{ matrix.python-version }}
+          check-latest: true
+      - name: Record resolved interpreter
+        run: python -VV
       - name: Install
         run: |
           python -m pip install --require-hashes -r requirements-ci.txt
@@ -60,6 +63,9 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
           python-version: "3.12"
+          check-latest: true
+      - name: Record resolved interpreter
+        run: python -VV
       - name: Install test dependency
         run: python -m pip install --require-hashes -r requirements-test312.txt
       - name: Run the bootstrap suite on 3.12
@@ -143,6 +149,9 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
           python-version: "3.12"
+          check-latest: true
+      - name: Record resolved interpreter
+        run: python -VV
       - name: Install uv
         run: python -m pip install --require-hashes -r requirements-uv.txt
       - name: Show uv version

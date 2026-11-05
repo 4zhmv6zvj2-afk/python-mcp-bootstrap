@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import tomllib
 from pathlib import Path
 from typing import Any
 
 import pytest
 from ruamel.yaml import YAML
-
-from python_mcp_bootstrap import core
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = ROOT / ".github" / "workflows"
@@ -88,23 +85,3 @@ def test_prepare_release_detects_existing_drafts() -> None:
     assert "releases?per_page=100" in create
     assert "select(.tag_name" in create
     assert all("gh release view" not in run for run in runs)
-
-
-def test_pinned_versions_agree_across_ci_and_metadata() -> None:
-    ci = _load("ci.yml")
-    matrix = ci["jobs"]["test"]["strategy"]["matrix"]["python-version"]
-    assert core.PIN in matrix
-    floor_prefix = f"3.{core.REQUIRED[1]}."
-    assert any(str(version).startswith(floor_prefix) for version in matrix)
-
-    macos = _load("macos.yml")
-    setup = next(
-        step
-        for step in _steps(macos, "test")
-        if "actions/setup-python" in str(step.get("uses", ""))
-    )
-    assert setup["with"]["python-version"] == core.PIN
-
-    assert (ROOT / ".python-version").read_text(encoding="utf-8").strip() == core.PIN
-    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
-    assert project["requires-python"] == f">={core.REQUIRED[0]}.{core.REQUIRED[1]}"

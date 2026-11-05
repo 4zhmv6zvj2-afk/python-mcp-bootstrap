@@ -526,19 +526,19 @@ def _release_tree(root: Path) -> None:
     package.mkdir(parents=True)
     (package / "__init__.py").write_text('__version__ = "0.1.0"\n', encoding="utf-8")
     (package / "core.py").write_text(
-        'PIN = "3.15.2"\nREQUIRED: Version = (3, 14, 0)\n', encoding="utf-8"
+        'PIN = "3.15.2"\nREQUIRED: Version = (3, 12, 0)\n', encoding="utf-8"
     )
     (root / "pyproject.toml").write_text(
         "[project]\n"
         'name = "python-mcp-bootstrap"\n'
         'dynamic = ["version"]\n'
-        'requires-python = ">=3.14"\n'
+        'requires-python = ">=3.12"\n'
         'license = "MIT"\n'
         "\n[tool.hatch.version]\n"
         'path = "src/python_mcp_bootstrap/__init__.py"\n',
         encoding="utf-8",
     )
-    (root / ".python-version").write_text("3.15.2\n", encoding="utf-8")
+    (root / ".python-version").write_text("3.15\n", encoding="utf-8")
     (root / "CHANGELOG.md").write_text("# Changelog\n\n## 0.1.0 — 2026-01-01\n", encoding="utf-8")
     notes = root / "docs" / "releases"
     notes.mkdir(parents=True)
@@ -555,7 +555,7 @@ def test_check_fails_when_pin_file_disagrees_with_core(tmp_path: Path) -> None:
     (tmp_path / ".python-version").write_text("9.9.9\n", encoding="utf-8")
 
     failures = check(tmp_path, allow_dirty=True)
-    assert any("python pin is not 3.15.2" in failure for failure in failures)
+    assert any("python pin line is not 3.15" in failure for failure in failures)
 
 
 def test_check_reports_unreadable_core_constants(tmp_path: Path) -> None:
