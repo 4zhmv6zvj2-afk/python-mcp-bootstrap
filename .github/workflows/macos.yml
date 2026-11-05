@@ -35,7 +35,10 @@ jobs:
           test "$(git cat-file -t "refs/tags/${GITHUB_REF_NAME}")" = "tag"
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
-          python-version: "3.15.2"
+          python-version: "3.15"
+          check-latest: true
+      - name: Record resolved interpreter
+        run: python -VV
       - name: Install
         run: |
           python -m pip install --require-hashes -r requirements-ci.txt
@@ -47,4 +50,4 @@ jobs:
       - name: Types
         run: python -m mypy
       - name: Tests
-        run: python -m pytest --cov=python_mcp_bootstrap --cov-report=term-missing --cov-fail-under=90
+        run: python -m pytest --cov --cov-report=term-missing --cov-fail-under=90

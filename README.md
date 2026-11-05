@@ -42,7 +42,7 @@ the package index you configured.
 
 ## What it does
 
-1. Looks for Python 3.14 or newer.
+1. Looks for Python 3.12 or newer.
 2. Looks for a working `.venv` in the project.
 3. If the Python or the app environment is missing or incomplete, prints a
    JSON report with a `card` and a `next` command. Nothing is downloaded.
@@ -82,10 +82,12 @@ Install from PyPI:
 python -m pip install python-mcp-bootstrap
 ```
 
-PyPI installs require Python 3.14+. On Python 3.12 or 3.13 the package cannot be
-pip-installed; vendoring `core.py` is the supported path there (see
-[Vendoring](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/blob/main/README.md#vendoring)) — `core.py` is deliberately kept to 3.12 syntax and
-stdlib only for exactly that case.
+PyPI installs require Python 3.12+. Vendoring `core.py` remains the recommended
+pattern for pre-install wrappers (see
+[Vendoring](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/blob/main/README.md#vendoring)):
+it is auth-free, needs no pip or PyPI at first run, and keeps the wrapper
+importable before the app's dependencies exist. The core is kept to 3.12 syntax
+and standard library only so it stays importable on the floor.
 
 GitHub releases from `v0.1.2` onward attach the wheel, the sdist,
 `SHA256SUMS`, Sigstore signature bundles (`.sigstore.json`), and a signed
@@ -171,9 +173,16 @@ including attached short-option values (`-t/tmp/x`). Venv-redirecting flags
 rejected. Non-path flags such as `--index-url` pass through; credentials in
 reports are masked.
 
+`requirements` is an optional tuple of project-relative, hash-pinned
+requirement files. When set, provisioning first runs
+`uv pip install --require-hashes -r <file>` for each entry, then installs the
+project with `--no-deps`; a failed hash check returns
+`runtime_requirements_failed` before the project install starts. This is the
+upstream form of the feature consumers used to patch into the vendored core.
+
 The core is one stdlib-only file, `core.py`. It must stay importable on Python
-3.12 because it runs before the app's dependencies are installed; CI runs the
-suite on 3.12 as well as on the supported 3.14 and 3.15 interpreters.
+3.12 because it runs before the app's dependencies are installed; 3.12 is also
+the supported floor, and CI runs the suite on the 3.12–3.15 lines.
 
 ### Vendoring
 
@@ -195,13 +204,16 @@ contract and the diagnostic CLI, not the vendor command.
 
 - Contract: [docs/contract.md](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/blob/main/docs/contract.md)
 - Integration details: [docs/integration.md](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/blob/main/docs/integration.md)
+- Version policy: [docs/version-policy.md](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/blob/main/docs/version-policy.md)
 - Example first run: [examples/first_run.py](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/blob/main/examples/first_run.py)
 - Changelog: [CHANGELOG.md](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/blob/main/CHANGELOG.md)
 - Contributing and release checks: [CONTRIBUTING.md](https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap/blob/main/CONTRIBUTING.md)
 
 ## Development
 
-Requires Python 3.14+. The development pin is 3.15.2.
+Requires Python 3.12+. The committed toolchain line is 3.15
+(`.python-version`); the package floor is 3.12; build and release jobs pin
+3.15.2.
 
 ```bash
 python3 -m venv .venv
@@ -214,8 +226,10 @@ python -m mypy
 python -m build
 ```
 
-CI targets Python 3.14.10 and 3.15.2 on Ubuntu and Windows, plus a 3.12
-compatibility job, a wheel/release gate, and the vendored example first run.
+CI runs the suite on the 3.12, 3.13, 3.14 and 3.15 lines on Ubuntu and
+Windows (each runner resolves the latest patch; the job prints `python -VV`),
+plus a wheel/release gate, an extracted-sdist suite, and the vendored example
+first run.
 `main` is protected: the release gate, the 3.12 job, the vendored example
 run, and the CodeQL analysis jobs are required before a merge, and
 force-pushes and deletions are blocked.

@@ -1,8 +1,9 @@
 """Core contract for the pre-install Python bootstrap.
 
 This module is deliberately stdlib-only and importable on Python 3.12.  The
-package metadata requires 3.14, but consumers copy this file into a first-run
+package metadata requires 3.12, and consumers copy this file into a first-run
 entry point that may execute before the application's dependencies exist.
+A consumer may raise ``BootstrapSpec.required`` to ask for a newer interpreter.
 """
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ Runner = Callable[[list[str], Path, dict[str, str], int], dict[str, Any]]
 Probe = Callable[[str], Version | None]
 Exec = Callable[[str, list[str], dict[str, str]], int | None]
 
-REQUIRED: Version = (3, 14, 0)
+REQUIRED: Version = (3, 12, 0)
 PIN = "3.15.2"
 # uv releases before this cannot resolve the pinned managed-Python build.
 UV_MIN_FOR_PIN: Version = (0, 13, 0)
@@ -60,6 +61,7 @@ class BootstrapSpec:
     required: Version = REQUIRED
     pin: str = PIN
     install_args: tuple[str, ...] = ("-e", ".")
+    requirements: tuple[str, ...] = ()
     verify_import: str | None = None
     card: str = CARD
     venv_dir: str = VENV_DIR
@@ -97,6 +99,7 @@ class BootstrapSpec:
         if self.verify_import is not None and not _valid_module(self.verify_import):
             raise ValueError(f"verify_import is not a module: {self.verify_import!r}")
         object.__setattr__(self, "install_args", _spec_install_args(self.install_args))
+        object.__setattr__(self, "requirements", _spec_requirements(self.requirements))
         if not self.card.strip():
             raise ValueError("card must not be empty")
         if not self.repair_card.strip():
@@ -129,6 +132,24 @@ def _spec_install_args(values: object) -> tuple[str, ...]:
         raise ValueError(f"install_args must be a sequence of strings: {values!r}")
     items = tuple(values)
     _require_project_install_args(items)
+    return cast("tuple[str, ...]", items)
+
+
+def _spec_requirements(values: object) -> tuple[str, ...]:
+    """Return hash-pinned requirement-file paths as an immutable tuple.
+
+    Each entry is a project-relative path to a ``uv pip install
+    --require-hashes -r`` input.  The project-path guard keeps the
+    provisioning command inside the consumer's checkout.
+    """
+
+    if isinstance(values, str) or not isinstance(values, (tuple, list)):
+        raise ValueError(f"requirements must be a sequence of paths: {values!r}")
+    items = tuple(values)
+    for item in items:
+        if not isinstance(item, str) or not item.strip():
+            raise ValueError(f"requirements must be non-empty paths: {values!r}")
+        _require_project_path("requirements", item)
     return cast("tuple[str, ...]", items)
 
 
@@ -578,12 +599,28 @@ def provision(
             if result.get("returncode") != 0:
                 return _failed("provision_failed", spec, steps=steps)
 
+    if spec.requirements:
+        requirements_command = [
+            uv,
+            "pip",
+            "install",
+            "--require-hashes",
+            *[part for requirement in spec.requirements for part in ("-r", requirement)],
+            "--python",
+            str(python),
+        ]
+        result = run(requirements_command, root, env, 600)
+        steps.append(_step(requirements_command, result))
+        if result.get("returncode") != 0:
+            return _failed("runtime_requirements_failed", spec, steps=steps)
+
     install_command = [
         uv,
         "pip",
         "install",
         "--python",
         str(python),
+        *(["--no-deps"] if spec.requirements else []),
         *spec.install_args,
     ]
     result = run(install_command, root, env, 600)

@@ -68,6 +68,16 @@ def _core_constants(
     return pin, (required_parts[0], required_parts[1], required_parts[2])
 
 
+def _pin_line(pin: str) -> str:
+    """Return the ``major.minor`` line of the product provisioning pin.
+
+    Committed ``.python-version`` files name the line (``3.15``); the runtime
+    still writes the exact ``PIN`` (``3.15.2``) when it provisions a project.
+    """
+
+    return ".".join(pin.split(".")[:2])
+
+
 def package_version(root: Path = ROOT) -> str:
     init = root / "src" / "python_mcp_bootstrap" / "__init__.py"
     for line in init.read_text(encoding="utf-8").splitlines():
@@ -394,9 +404,10 @@ def check(root: Path = ROOT, *, allow_dirty: bool = False, tag: str | None = Non
     require(pin_path.is_file(), "missing .python-version")
     if pin_path.is_file() and core_constants is not None:
         pin, _required = core_constants
+        pin_line = _pin_line(pin)
         require(
-            pin_path.read_text(encoding="utf-8").strip() == pin,
-            f"python pin is not {pin}",
+            pin_path.read_text(encoding="utf-8").strip() == pin_line,
+            f"python pin line is not {pin_line}",
         )
 
     license_path = root / "LICENSE"

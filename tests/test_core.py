@@ -69,9 +69,9 @@ def test_prerelease_does_not_satisfy_the_floor() -> None:
 
 def test_format_and_required_text() -> None:
     assert format_version((3, 14, 10)) == "3.14.10"
-    assert required_text(REQUIRED) == "3.14.0"
+    assert required_text(REQUIRED) == "3.12.0"
     assert required_text((3, 15, 2)) == "3.15.2"
-    assert floor_text(REQUIRED) == "3.14"
+    assert floor_text(REQUIRED) == "3.12"
     assert floor_text((3, 14, 10)) == "3.14.10"
 
 
@@ -83,6 +83,7 @@ def test_spec_defaults_are_the_shared_contract() -> None:
     assert spec.required == REQUIRED
     assert spec.pin == PIN
     assert spec.install_args == ("-e", ".")
+    assert spec.requirements == ()
     assert spec.verify_import is None
     assert spec.card == CARD
     assert spec.repair_card == REPAIR_CARD
@@ -140,6 +141,19 @@ def test_spec_rejects_empty_app_and_bad_pin() -> None:
         BootstrapSpec(app="example-mcp", card=" ")
     with pytest.raises(ValueError, match="repair_card"):
         BootstrapSpec(app="example-mcp", repair_card=" ")
+
+
+def test_spec_requirements_are_copied_and_validated() -> None:
+    spec = BootstrapSpec(app="example-mcp", requirements=["requirements-runtime.txt"])
+    assert spec.requirements == ("requirements-runtime.txt",)
+    with pytest.raises(FrozenInstanceError):
+        spec.requirements = ()  # type: ignore[misc]
+
+    with pytest.raises(ValueError, match="requirements"):
+        BootstrapSpec(app="example-mcp", requirements="requirements-runtime.txt")  # type: ignore[arg-type]
+    for bad in ("", "  ", "/etc/passwd", "C:\\tmp\\x", "../x", "..\\x"):
+        with pytest.raises(ValueError, match="requirements"):
+            BootstrapSpec(app="example-mcp", requirements=(bad,))
 
 
 @pytest.mark.parametrize(

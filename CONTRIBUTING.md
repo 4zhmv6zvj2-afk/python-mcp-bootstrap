@@ -2,7 +2,9 @@
 
 ## Setup
 
-The development pin is Python 3.15.2. The package floor is 3.14.
+The development toolchain follows the 3.15 line (`.python-version`). Build and
+release jobs pin Python 3.15.2; the package floor is 3.12 and product
+provisioning pins 3.15.2. See [docs/version-policy.md](docs/version-policy.md).
 
 ```bash
 python3 -m venv .venv
@@ -41,7 +43,7 @@ vendored example run, and the CodeQL analysis jobs (`Analyze (python)`,
 `Analyze (actions)`) are required status checks before a pull request merges,
 and force-pushes and branch deletions are blocked.
 
-The 3.14/3.15 matrix runs alongside those required jobs, but it is not a
+The 3.12–3.15 matrix runs alongside those required jobs, but it is not a
 required check, so read the run rather than the badge: a queued Windows cell is
 not green. macOS runs on `main`, tags and a weekly schedule, not on pull
 requests. An extracted-sdist suite (job `sdist-suite`) runs on every pull
@@ -58,8 +60,8 @@ the build; a change that fixes a bug should include a regression test.
 ## Rules
 
 - `src/python_mcp_bootstrap/core.py` stays stdlib-only.
-- `core.py` must remain importable and runnable on Python 3.12; CI runs the
-  suite on 3.12 as well as on the 3.14 and 3.15 matrix.
+- `core.py` must remain importable and runnable on Python 3.12, the floor; CI
+  runs the suite on the 3.12–3.15 lines.
 - Never import `mcp` from the bootstrap path.
 - Never add an install, download, or provisioning subprocess before explicit
   consent. Version probes and the isolated import check may run before consent.

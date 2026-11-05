@@ -24,8 +24,8 @@ consumer/
 ```json
 {
   "name": "python-mcp-bootstrap",
-  "version": "0.1.0",
-  "tag": "v0.1.0",
+  "version": "0.2.0",
+  "tag": "v0.2.0",
   "commit": "<full commit>",
   "source": "https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap",
   "file": "python_mcp_bootstrap.py",
@@ -82,27 +82,43 @@ to `uv pip install` directly and never uses a shell.
 For a source distribution, the adapter imports the vendored file rather than a
 Git dependency. The vendor step keeps the pre-install path auth-free.
 
-## Python floor vs. vendoring
+`requirements` is the upstream form of the hash-pinned runtime install that
+consumers used to patch into the vendored core. Pass project-relative
+requirement files and the core installs them first, then installs the project
+with `--no-deps`:
 
-`pip install python-mcp-bootstrap` requires Python 3.14+ (the package metadata
-says `requires-python >=3.14`). A consumer whose first-run wrapper must execute
-on Python 3.12 or 3.13 cannot pip-install it: that consumer vendors `core.py`
-into the wrapper instead. Vendored code is held to 3.12 syntax and standard
-library only, which is why the package imports nothing outside the stdlib and
-never imports the MCP SDK.
+```python
+SPEC = BootstrapSpec(
+    app="example-mcp",
+    entrypoint="first_run.py",
+    env_var="EXAMPLE_MCP_INTERPRETER",
+    requirements=("requirements-runtime.txt",),
+    verify_import="example_mcp",
+    package_main=continue_setup,
+)
+```
 
-## Why not a pip dependency
+A missing or mismatched requirements file returns
+`runtime_requirements_failed` before the project install starts. Paths are
+validated with the same project-local rule as the other bootstrap paths.
 
-A first-run entry point may execute on Python 3.12, before the application's
-dependencies are installed. A package whose metadata says `requires-python
->=3.14` cannot be installed in that environment. Vendoring a stdlib-only core
-solves the ordering problem and keeps an auth-free install working without
-GitHub credentials.
+## Python floor and vendoring
+
+The package floor is Python 3.12: `requires-python = ">=3.12"`, and the core
+checks `sys.version_info >= (3, 12)`. A consumer may raise
+`BootstrapSpec.required` when it needs a newer interpreter, but the package
+itself supports 3.12.
+
+Vendoring `core.py` remains the recommended pattern for pre-install wrappers,
+not a workaround for the package floor. It keeps the first-run path auth-free
+and independent of pip or PyPI, so the wrapper imports before the application's
+dependencies exist. Vendored code is held to 3.12 syntax and standard library
+only, which is why the core imports nothing outside the stdlib and never
+imports the MCP SDK.
 
 ## Updating
 
 1. Tag and release this repository.
-2. Run the consumer's vendor script with the new tag.
-3. Commit the copied core and the new `VENDOR.json`.
-4. Run the consumer's full test suite on 3.14 and 3.15, plus a core smoke on
-   3.12.
+2. Run the consumer's vendor script from a checkout of the new tag.
+3. Commit the copied core and the new `VENDOR.json`; do not add a local patch.
+4. Run the consumer's full test suite on the 3.12–3.15 lines.
