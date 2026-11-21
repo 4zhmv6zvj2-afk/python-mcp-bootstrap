@@ -108,10 +108,9 @@ the release is still a draft, verify, then publish the draft.
    ```bash
    gh release download v<version> --dir /tmp/release-check \
      --pattern '*.whl' --pattern '*.tar.gz' --pattern SHA256SUMS
-   (cd /tmp/release-check && sha256sum -c SHA256SUMS)
+   python scripts/release_check.py --tag v<version> --dist /tmp/release-check
    gh attestation verify /tmp/release-check/*.whl \
      --repo 4zhmv6zvj2-afk/python-mcp-bootstrap
-   python scripts/release_check.py --tag v<version>
    ```
 
    Do not publish on partial success.
@@ -124,8 +123,8 @@ the release is still a draft, verify, then publish the draft.
    ```
 
    Publishing fires `publish.yml`, which downloads the published assets,
-   verifies checksums, signatures and provenance, runs the final
-   `release_check --tag`, and only then publishes to PyPI under the `pypi`
+   runs the same `release_check.py --tag` on that `dist/`, verifies signatures
+   and provenance, and only then publishes to PyPI under the `pypi`
    environment. It has no permission to modify release assets.
 
 6. Never hand-attach assets, never publish a draft before every check passes,

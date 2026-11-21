@@ -74,12 +74,8 @@ jobs:
             --pattern "*.whl" --pattern "*.tar.gz" --pattern "SHA256SUMS" \
             --pattern "*.sigstore.json"
 
-      - name: Verify checksums
-        working-directory: dist
-        run: sha256sum -c SHA256SUMS
-
-      - name: Verify release assets, signatures and provenance
-        run: python scripts/release_check.py --tag "$TAG"
+      - name: Verify the distributions to publish
+        run: python scripts/release_check.py --tag "$TAG" --dist dist
 
       - name: Verify build provenance attestations
         run: |
