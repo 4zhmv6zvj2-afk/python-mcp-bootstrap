@@ -271,17 +271,7 @@ def test_missing_release_skips(
 
 
 def _required_asset_names(version: str = "0.1.0") -> list[str]:
-    wheel = f"python_mcp_bootstrap-{version}-py3-none-any.whl"
-    sdist = f"python_mcp_bootstrap-{version}.tar.gz"
-    return [
-        wheel,
-        sdist,
-        "SHA256SUMS",
-        f"{wheel}.sigstore.json",
-        f"{sdist}.sigstore.json",
-        "SHA256SUMS.sigstore.json",
-        "provenance.intoto.jsonl",
-    ]
+    return list(release_check._required_asset_names(version))
 
 
 @pytest.mark.parametrize("missing", _required_asset_names())
@@ -566,3 +556,163 @@ def test_check_reports_unreadable_core_constants(tmp_path: Path) -> None:
 
     failures = check(tmp_path, allow_dirty=True)
     assert any("cannot read PIN and REQUIRED" in failure for failure in failures)
+
+
+def _publish_workflow() -> Path | None:
+    workflow = ROOT / ".github" / "workflows" / "publish.yml"
+    return workflow if workflow.is_file() else None
+
+
+def test_publish_workflow_checks_the_distribution_directory() -> None:
+    """AC-boot-rel-1"""
+
+    workflow = _publish_workflow()
+    if workflow is None:
+        pytest.skip("workflow files are not shipped in the sdist")
+    text = workflow.read_text(encoding="utf-8")
+    assert "sha256sum" not in text
+    assert 'python scripts/release_check.py --tag "$TAG" --dist dist' in text
+
+
+def _write_dist(dist: Path, version: str, *, tamper: bool = False) -> None:
+    dist.mkdir(parents=True, exist_ok=True)
+    wheel_name, sdist_name = release_check._artifact_names(version)
+    payloads = {wheel_name: b"wheel-bytes", sdist_name: b"sdist-bytes"}
+    lines: list[str] = []
+    for name, payload in payloads.items():
+        (dist / name).write_bytes(payload)
+        lines.append(f"{hashlib.sha256(payload).hexdigest()}  {name}")
+    (dist / "SHA256SUMS").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    if tamper:
+        (dist / wheel_name).write_bytes(b"tampered")
+
+
+def test_check_owns_asset_names_and_distribution_checksum(tmp_path: Path) -> None:
+    """AC-boot-rel-2"""
+
+    version = "0.1.0"
+    names = release_check._required_asset_names(version)
+    wheel_name, sdist_name = release_check._artifact_names(version)
+    assert names[0] == wheel_name
+    assert names[1] == sdist_name
+    assert "SHA256SUMS" in names
+    assert f"{wheel_name}.sigstore.json" in names
+    assert f"{sdist_name}.sigstore.json" in names
+    assert "SHA256SUMS.sigstore.json" in names
+    assert "provenance.intoto.jsonl" in names
+    checker = Path(release_check.__file__).read_text(encoding="utf-8")
+    assert "sha256sum" not in checker
+
+    dist = tmp_path / "dist"
+    _write_dist(dist, version)
+    assert release_check._dist_errors(dist, version) == []
+    absent = release_check._dist_errors(tmp_path / "absent", version)
+    assert any("not a directory" in error for error in absent)
+
+    _write_dist(dist, version, tamper=True)
+    assert any("digest mismatch" in error for error in release_check._dist_errors(dist, version))
+
+
+def test_distribution_directory_problems_are_reported(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """AC-boot-rel-3"""
+
+    version = package_version(ROOT)
+    tag = f"v{version}"
+    monkeypatch.setattr(release_check, "_tag_problem", lambda *_args: None)
+    monkeypatch.setattr(release_check.shutil, "which", lambda _name: None)
+
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    failures = check(ROOT, allow_dirty=True, tag=tag, dist=empty)
+    assert any("dist is missing" in failure for failure in failures)
+    assert "skipping" in capsys.readouterr().err
+
+    good = tmp_path / "good"
+    _write_dist(good, version)
+    assert check(ROOT, allow_dirty=True, tag=tag, dist=good) == []
+    assert "skipping" in capsys.readouterr().err
+
+    releases, contents = _release_fixture(version)
+    _install_fake_gh(monkeypatch, tmp_path, releases=releases, contents=contents, unreadable=True)
+    bad = tmp_path / "bad"
+    _write_dist(bad, version, tamper=True)
+    failures = check(ROOT, allow_dirty=True, tag=tag, dist=bad)
+    assert any("digest mismatch" in failure for failure in failures)
+    assert "not readable" in capsys.readouterr().err
+    assert check(ROOT, allow_dirty=True, tag=tag, dist=good) == []
+    assert "not readable" in capsys.readouterr().err
+
+    bare = tmp_path / "bare"
+    bare.mkdir()
+    unreadable = check(bare, allow_dirty=True, dist=bare)
+    assert any("package version is unreadable" in failure for failure in unreadable)
+
+    workflow = _publish_workflow()
+    if workflow is not None:
+        text = workflow.read_text(encoding="utf-8")
+        command = 'python scripts/release_check.py --tag "$TAG" --dist dist'
+        assert command in text
+        window = text[text.index(command) : text.index(command) + len(command) + 80]
+        assert "continue-on-error" not in window
+
+
+def test_signature_verification_stays_in_the_workflow() -> None:
+    """AC-boot-rel-4"""
+
+    checker = Path(release_check.__file__).read_text(encoding="utf-8")
+    assert "cosign" not in checker
+    assert "gh attestation" not in checker
+    workflow = _publish_workflow()
+    if workflow is None:
+        pytest.skip("workflow files are not shipped in the sdist")
+    text = workflow.read_text(encoding="utf-8")
+    assert "cosign verify-blob" in text
+    assert "gh attestation verify" in text
+    assert "sigstore/cosign-installer" in text
+    check_at = text.index("scripts/release_check.py")
+    attest_at = text.index("gh attestation verify")
+    cosign_at = text.index("cosign verify-blob")
+    assert check_at < attest_at < cosign_at
+
+
+def test_contributor_guide_uses_the_release_check() -> None:
+    """AC-boot-rel-5"""
+
+    text = (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8")
+    assert "python scripts/release_check.py --tag v<version> --dist /tmp/release-check" in text
+    assert "sha256sum" not in text
+
+
+def test_nonzero_floor_patch_is_rejected(tmp_path: Path) -> None:
+    """AC-boot-ver-6"""
+
+    _release_tree(tmp_path)
+    core_path = tmp_path / "src" / "python_mcp_bootstrap" / "core.py"
+    core_path.write_text(
+        'PIN = "3.15.2"\nREQUIRED: Version = (3, 12, 1)\n',
+        encoding="utf-8",
+    )
+    failures = check(tmp_path, allow_dirty=True)
+    assert any("3.12.1" in failure and "must use patch 0" in failure for failure in failures)
+    assert not any("requires-python is not" in failure for failure in failures)
+    assert release_check._metadata_requires_python((3, 12, 1)) == ">=3.12"
+
+
+def test_main_accepts_a_distribution_directory(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    seen: dict[str, object] = {}
+
+    def fake_check(**kwargs: object) -> list[str]:
+        seen.update(kwargs)
+        return []
+
+    monkeypatch.setattr(release_check, "check", fake_check)
+    assert release_check.main(["--allow-dirty", "--dist", str(tmp_path)]) == 0
+    assert seen["dist"] == tmp_path
+    assert seen["allow_dirty"] is True
+    assert seen["tag"] is None

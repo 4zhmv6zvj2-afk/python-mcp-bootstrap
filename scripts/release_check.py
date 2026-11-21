@@ -4,7 +4,8 @@
 The check is offline and read-only.  It verifies the dynamic version
 configuration, metadata, the changelog, release notes, Python compatibility,
 tag/version and annotated-tag agreement when ``--tag`` is given, GitHub release
-assets when ``gh`` is available, and tracked-file hygiene.
+assets when ``gh`` is available, the checksum of a ``--dist`` directory when
+one is given, and tracked-file hygiene.
 """
 
 from __future__ import annotations
@@ -71,11 +72,28 @@ def _core_constants(
 def _pin_line(pin: str) -> str:
     """Return the ``major.minor`` line of the product provisioning pin.
 
-    Committed ``.python-version`` files name the line (``3.15``); the runtime
-    still writes the exact ``PIN`` (``3.15.2``) when it provisions a project.
+    Committed ``.python-version`` files name that line. The runtime still
+    writes the exact ``PIN`` when it provisions a project.
     """
 
     return ".".join(pin.split(".")[:2])
+
+
+def _metadata_requires_python(required: tuple[int, int, int]) -> str:
+    """Metadata floor: ``>=`` plus major and minor.
+
+    The patch component is not part of the comparison.
+    """
+
+    return f">={required[0]}.{required[1]}"
+
+
+def _ci_lines(required: tuple[int, int, int], pin: str) -> list[str]:
+    """Continuous minor run from the floor through the pin's minor."""
+
+    major, floor_minor, _patch = required
+    pin_minor = int(_pin_line(pin).split(".")[1])
+    return [f"{major}.{minor}" for minor in range(floor_minor, pin_minor + 1)]
 
 
 def package_version(root: Path = ROOT) -> str:
@@ -237,12 +255,34 @@ def _download_assets(
     return None
 
 
+def _artifact_names(version: str) -> tuple[str, str]:
+    """Wheel and sdist filenames for ``version``."""
+
+    wheel = f"python_mcp_bootstrap-{version}-py3-none-any.whl"
+    sdist = f"python_mcp_bootstrap-{version}.tar.gz"
+    return wheel, sdist
+
+
+def _required_asset_names(version: str) -> tuple[str, ...]:
+    """Asset names a release must carry. This check owns the list."""
+
+    wheel, sdist = _artifact_names(version)
+    return (
+        wheel,
+        sdist,
+        "SHA256SUMS",
+        f"{wheel}.sigstore.json",
+        f"{sdist}.sigstore.json",
+        "SHA256SUMS.sigstore.json",
+        "provenance.intoto.jsonl",
+    )
+
+
 def _checksum_errors(dest: Path, version: str) -> list[str]:
     """Verify SHA256SUMS names every artifact and matches its bytes."""
 
     errors: list[str] = []
-    wheel = f"python_mcp_bootstrap-{version}-py3-none-any.whl"
-    sdist = f"python_mcp_bootstrap-{version}.tar.gz"
+    wheel, sdist = _artifact_names(version)
     sums = dest / "SHA256SUMS"
     if not sums.is_file():
         return ["release asset check: SHA256SUMS was not downloaded"]
@@ -268,6 +308,24 @@ def _checksum_errors(dest: Path, version: str) -> list[str]:
     return errors
 
 
+def _dist_errors(dist: Path, version: str) -> list[str]:
+    """Checksum ``dist``. Missing files and digest mismatches are errors.
+
+    This path does not consult ``gh`` and does not skip.
+    """
+
+    if not dist.is_dir():
+        return [f"release asset check: dist directory {dist} is not a directory"]
+    wheel, sdist = _artifact_names(version)
+    errors: list[str] = []
+    for name in (wheel, sdist, "SHA256SUMS"):
+        if not (dist / name).is_file():
+            errors.append(f"release asset check: dist is missing {name}")
+    if errors:
+        return errors
+    return _checksum_errors(dist, version)
+
+
 def _release_asset_errors(root: Path, tag: str, version: str) -> list[str]:
     """Check the GitHub release assets when gh is available.
 
@@ -290,17 +348,8 @@ def _release_asset_errors(root: Path, tag: str, version: str) -> list[str]:
     assets = _release_assets(root, gh, tag, slug)
     if assets is None:
         return []
-    wheel = f"python_mcp_bootstrap-{version}-py3-none-any.whl"
-    sdist = f"python_mcp_bootstrap-{version}.tar.gz"
-    required = {
-        wheel,
-        sdist,
-        "SHA256SUMS",
-        f"{wheel}.sigstore.json",
-        f"{sdist}.sigstore.json",
-        "SHA256SUMS.sigstore.json",
-        "provenance.intoto.jsonl",
-    }
+    wheel, sdist = _artifact_names(version)
+    required = set(_required_asset_names(version))
     errors = [
         f"release {tag!r} is missing asset {name}" for name in sorted(required - assets.keys())
     ]
@@ -351,7 +400,13 @@ def _version_config_errors(project: object, tool: object) -> list[str]:
     return errors
 
 
-def check(root: Path = ROOT, *, allow_dirty: bool = False, tag: str | None = None) -> list[str]:
+def check(
+    root: Path = ROOT,
+    *,
+    allow_dirty: bool = False,
+    tag: str | None = None,
+    dist: Path | None = None,
+) -> list[str]:
     failures: list[str] = []
 
     def require(condition: bool, message: str) -> None:
@@ -387,7 +442,11 @@ def check(root: Path = ROOT, *, allow_dirty: bool = False, tag: str | None = Non
         failures.append("cannot read PIN and REQUIRED from core.py")
     else:
         pin, required = core_constants
-        floor_text = f">={required[0]}.{required[1]}"
+        if required[2] != 0:
+            failures.append(
+                f"package floor {required[0]}.{required[1]}.{required[2]} must use patch 0"
+            )
+        floor_text = _metadata_requires_python(required)
         require(
             project.get("requires-python") == floor_text,
             f"requires-python is not {floor_text}",
@@ -399,6 +458,13 @@ def check(root: Path = ROOT, *, allow_dirty: bool = False, tag: str | None = Non
             if tag_error:
                 failures.append(tag_error)
             failures.extend(_release_asset_errors(root, tag, version))
+    if dist is not None:
+        if version:
+            failures.extend(_dist_errors(dist, version))
+        else:
+            failures.append(
+                "release asset check: dist was given but the package version is unreadable"
+            )
 
     pin_path = root / ".python-version"
     require(pin_path.is_file(), "missing .python-version")
@@ -430,10 +496,13 @@ def check(root: Path = ROOT, *, allow_dirty: bool = False, tag: str | None = Non
     require(core.is_file(), "missing core.py")
     if core.is_file():
         source = core.read_text(encoding="utf-8")
-        try:
-            ast.parse(source, filename=str(core), feature_version=(3, 12))
-        except SyntaxError as exc:
-            failures.append(f"core.py is not Python 3.12 syntax: {exc}")
+        if core_constants is not None:
+            required = core_constants[1]
+            feature = (required[0], required[1])
+            try:
+                ast.parse(source, filename=str(core), feature_version=feature)
+            except SyntaxError as exc:
+                failures.append(f"core.py is not Python {feature[0]}.{feature[1]} syntax: {exc}")
         require("import mcp" not in source and "from mcp" not in source, "core.py imports mcp")
 
     require((root / "scripts" / "vendor.py").is_file(), "missing scripts/vendor.py")
@@ -461,8 +530,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--allow-dirty", action="store_true")
     parser.add_argument("--tag", help="release tag that must equal v<version>")
+    parser.add_argument(
+        "--dist",
+        type=Path,
+        help="distribution directory to checksum; problems are reported and not skipped",
+    )
     args = parser.parse_args(argv)
-    failures = check(allow_dirty=args.allow_dirty, tag=args.tag)
+    failures = check(allow_dirty=args.allow_dirty, tag=args.tag, dist=args.dist)
     if failures:
         for failure in failures:
             print(f"release check failed: {failure}", file=sys.stderr)
