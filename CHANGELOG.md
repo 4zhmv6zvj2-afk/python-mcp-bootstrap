@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.2.1 — 2026-11-22
+
+The release check verifies the distributions about to be published, and the
+Python policy checks take their numbers from `core.py`.
+
+### Changed
+
+- `publish.yml` runs `scripts/release_check.py` on the `dist/` directory it is
+  about to publish instead of running its own checksum command. The checker
+  owns the required asset names and that directory's checksum, and the
+  contributor guide uses the same command.
+- The GitHub release asset check still skips when `gh` is missing or the
+  release is not readable yet. Signature and provenance verification stay in
+  the workflow.
+- The checker and the version-policy tests read the package floor and the
+  product pin from `core.py`. Expected CI lines are the continuous minor run
+  from the floor through the pin's minor; a floor patch other than zero is
+  rejected, and `requires-python` stays `>=` plus major and minor.
+
 ## 0.2.0 — 2026-11-05
 
 One Python floor for the bootstrap and its consumers, and the hash-pinned
