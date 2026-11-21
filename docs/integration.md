@@ -24,8 +24,8 @@ consumer/
 ```json
 {
   "name": "python-mcp-bootstrap",
-  "version": "0.2.0",
-  "tag": "v0.2.0",
+  "version": "0.2.1",
+  "tag": "v0.2.1",
   "commit": "<full commit>",
   "source": "https://github.com/4zhmv6zvj2-afk/python-mcp-bootstrap",
   "file": "python_mcp_bootstrap.py",
