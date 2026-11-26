@@ -75,6 +75,10 @@ Releases are draft-first because GitHub release immutability is enabled: assets
 cannot be attached after a release is published. Build and attach them while
 the release is still a draft, verify, then publish the draft.
 
+Commits and tags in this public repository must not use `[skip ci]`.
+GitHub also skips tag-push workflows when the tagged commit message
+contains it.
+
 1. Merge the version bump — the `__version__` in
    `src/python_mcp_bootstrap/__init__.py` (there is no version in
    `pyproject.toml`) — plus the changelog entry and
